@@ -22,7 +22,7 @@ config = {
     -- OAuth request settings
     --
     -- These settings are for Osiris (https://github.com/sneridagh/osiris)
-    -- Adjust as needed.
+    -- Adjust as needed. Need to be on lsso_domain.
     oauth_auth_endpoint = "/token", -- Endpoint used for retrieving tokens
     oauth_token_endpoint = "/checktoken", -- Endpoint used for checking tokens
     oauth_auth_context = {
@@ -31,7 +31,8 @@ config = {
     }, -- Additional static parameters that will be passed to the auth endpoint
 
     -- Location settings
-    lsso_domain = "https://sso.example.org", -- No trailing slash!
+    lsso_domain = "sso.example.org", -- No trailing slash!
+    lsso_scheme = "https",
     lsso_login_redirect = "/auth", -- Endpoint to redirect to for auth.
     lsso_capture_location = "/auth/verify", -- Endpoint to capture for auth
     lsso_default_redirect = "https://maio.me", -- Endpoint to redirect to when no ?next

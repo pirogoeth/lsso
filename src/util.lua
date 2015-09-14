@@ -127,6 +127,10 @@ function set_cookies(cookies)
         print("Cookie: " .. v)
         table.insert(cset, v)
     end
+
+    for _, v in pairs(cset) do
+        print("CSET: " .. v)
+    end
     ngx.header["Set-Cookie"] = cset
 end
 
@@ -136,20 +140,26 @@ function delete_cookie(cookie_name)
         cookies = {cookies}
     end
 
+    local expiry = "Expires=Thu, 01 Jan 1970 00:00:00 UTC"
+
     for k, v in pairs(cookies) do
-        local name = string.match(value, "(.-)=")
+        local name = string.match(v, "(.-)=")
         if name == cookie_name then
-            table.remove(cookies, key)
+            table.remove(cookies, k)
+            table.insert(cookies, name .. "=; " .. expiry)
         end
     end
 
     ngx.header["Set-Cookie"] = cookies or {}
 end
 
-function create_cookie(params)
+function create_cookie(key, value, params)
     local cookie = ""
     for k, v in pairs(params) do
         cookie = cookie .. k .. "=" .. v .. "; "
     end
+
+    cookie = key .. "=" .. value .. "; " .. cookie
+
     return cookie
 end

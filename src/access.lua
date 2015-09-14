@@ -14,9 +14,10 @@ local redis = require "redis"
 local util = require "util"
 
 -- Some shorthand.
-local lsso_login = config.lsso_domain .. config.lsso_login_redirect
-local lsso_capture = config.lsso_domain .. config.lsso_capture_location
+local lsso_login = config.lsso_scheme .. "://" .. config.lsso_domain .. config.lsso_login_redirect
+local lsso_capture = config.lsso_scheme .. "://" .. config.lsso_domain .. config.lsso_capture_location
 local redis_response = nil
+
 
 nginx_uri = ngx.var.uri
 nginx_furl = ngx.var.scheme .. "://" .. ngx.var.server_name .. ngx.var.request_uri
@@ -28,7 +29,6 @@ function resolve_session(session_token)
     rd_sess_key = util.redis_key("session:" .. session_token)
     redis_response = rdc:exists(rd_sess_key)
     if not redis_response then
-        print("Redis session does not exist! " .. rd_sess_key)
         return nil
     end
 
@@ -66,7 +66,7 @@ function validate_token(token_response)
     end
 end
 
-if nginx_uri == config.lsso_capture_location then
+if nginx_furl == lsso_capture then
     if ngx.req.get_method() ~= "POST" then
         ngx.redirect(lsso_login)
     end
@@ -79,14 +79,17 @@ if nginx_uri == config.lsso_capture_location then
             local okay, is_valid = util.func_call(validate_token, session)
             if is_valid then
                 ngx.log(ngx.NOTICE, "User session [" .. user_session .. "] is valid.")
-                if util.key_in_table(ngx.req.get_uri_args(), "next") then
-                    ngx.redirect(ngx.req.get_uri_args().next)
+                user_redirect = util.get_cookie(util.cookie_key("Redirect"))
+                if user_redirect then
+                    util.delete_cookie(util.cookie_key("Redirect"))
+                    ngx.redirect(user_redirect)
                 else
                     ngx.redirect(config.lsso_default_redirect)
                 end
             else
                 ngx.log(ngx.NOTICE, "User session[" .. user_session .. "] is NOT valid!")
                 util.delete_cookie(util.cookie_key("Session"))
+                util.delete_cookie(util.cookie_key("Redirect"))
             end
         end
     end
@@ -128,7 +131,13 @@ if nginx_uri == config.lsso_capture_location then
     session_key = util.generate_random_string(64) -- XXX - make length configurable?
     rd_sess_key = util.redis_key("session:" .. session_key)
 
-    util.set_cookies(util.cookie_key("Session") .. "=" .. session_key)
+    util.set_cookies({
+        util.create_cookie(util.cookie_key("Session"), session_key, {
+            ["Path"] = "/",
+            ["Domain"] = "." .. config.cookie_domain,
+            ["Max-Age"] = config.cookie_lifetime
+        })
+    })
 
     rdc:pipeline(function(p)
         p:hset(rd_sess_key, "username", credentials["user"])
@@ -157,19 +166,20 @@ elseif nginx_uri ~= config.lsso_capture_location then
             local okay, is_valid = util.func_call(validate_token, session)
             if is_valid then
                 ngx.log(ngx.NOTICE, "User session [" .. user_session .. "] is valid.")
-                return
+                return -- Allow access phase to continue
             else
                 ngx.log(ngx.NOTICE, "User session[" .. user_session .. "] is NOT valid!")
                 util.delete_cookie(util.cookie_key("Session"))
+                util.delete_cookie(util.cookie_key("Redirect"))
             end
         end
     end
 
     util.set_cookies({
-        util.create_cookie({
-            ["Domain"] = "." .. config.cookie_domain,
+        util.create_cookie(util.cookie_key("Redirect"), nginx_furl, {
             ["Max-Age"] = config.cookie_lifetime,
-            [util.cookie_key("Redirect")] = nginx_furl
+            ["Domain"] = "." .. config.cookie_domain,
+            ["Path"] = "/"
         })
     })
 
