@@ -19,6 +19,10 @@ config = {
     cookie_domain = "example.org",
     cookie_lifetime = 21600, -- Lines up with oauth token expiry (value in seconds)
 
+    -- Session settings
+    -- Recommended: at least half your cookie lifetime, or half your key lifetime
+    session_checkin = 10800, -- Time before validate_token is called to ensure the OAuth token is still active.
+
     -- OAuth request settings
     --
     -- These settings are for Osiris (https://github.com/sneridagh/osiris)

@@ -124,13 +124,9 @@ function set_cookies(cookies)
     end
 
     for _, v in pairs(cookies) do
-        print("Cookie: " .. v)
         table.insert(cset, v)
     end
 
-    for _, v in pairs(cset) do
-        print("CSET: " .. v)
-    end
     ngx.header["Set-Cookie"] = cset
 end
 
