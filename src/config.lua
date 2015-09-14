@@ -16,6 +16,7 @@ config = {
 
     -- Auth cookie settings
     cookie_prefix = "LSSO_",
+    cookie_domain = "example.org",
     cookie_lifetime = 21600, -- Lines up with oauth token expiry (value in seconds)
 
     -- OAuth request settings
@@ -33,6 +34,7 @@ config = {
     lsso_domain = "https://sso.example.org", -- No trailing slash!
     lsso_login_redirect = "/auth", -- Endpoint to redirect to for auth.
     lsso_capture_location = "/auth/verify", -- Endpoint to capture for auth
+    lsso_default_redirect = "https://maio.me", -- Endpoint to redirect to when no ?next
 
     -- Debugging settings
     -- Debugging wraps calls and sends any exceptions to Sentry through Raven.

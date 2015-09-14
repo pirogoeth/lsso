@@ -19,6 +19,7 @@ local lsso_capture = config.lsso_domain .. config.lsso_capture_location
 local redis_response = nil
 
 nginx_uri = ngx.var.uri
+nginx_furl = ngx.var.scheme .. "://" .. ngx.var.server_name .. ngx.var.request_uri
 nginx_client_address = ngx.var.remote_addr
 
 -- Functions for session validation.
@@ -45,8 +46,9 @@ function validate_token(token_response)
     local username = token_response.username
 
     local token_table = {
-        token = token,
-        username = username
+        access_token = token,
+        username = username,
+        scope = "ALL"
     }
     token_table = ngx.encode_args(token_table)
 
@@ -71,13 +73,19 @@ if nginx_uri == config.lsso_capture_location then
 
     user_session = util.get_cookie(util.cookie_key("Session"))
     if user_session then
+        ngx.log(ngx.NOTICE, "Checking existing user session: " .. user_session)
         local okay, session = util.func_call(resolve_session, user_session)
         if okay and session then
             local okay, is_valid = util.func_call(validate_token, session)
             if is_valid then
-                -- XXX - Need to redirect stuff.
-                ngx.exit(ngx.HTTP_OK)
+                ngx.log(ngx.NOTICE, "User session [" .. user_session .. "] is valid.")
+                if util.key_in_table(ngx.req.get_uri_args(), "next") then
+                    ngx.redirect(ngx.req.get_uri_args().next)
+                else
+                    ngx.redirect(config.lsso_default_redirect)
+                end
             else
+                ngx.log(ngx.NOTICE, "User session[" .. user_session .. "] is NOT valid!")
                 util.delete_cookie(util.cookie_key("Session"))
             end
         end
@@ -131,4 +139,39 @@ if nginx_uri == config.lsso_capture_location then
     end)
 
     -- XXX - need to do processing here!
+    user_redirect = util.get_cookie(util.cookie_key("Redirect"))
+    if user_redirect then
+        util.delete_cookie(util.cookie_key("Redirect"))
+        ngx.redirect(user_redirect)
+    else
+        ngx.redirect(config.lsso_default_redirect)
+    end
+elseif nginx_uri ~= config.lsso_capture_location then
+    -- We're at anything other than the auth verification location.
+    -- Let's do this!
+    user_session = util.get_cookie(util.cookie_key("Session"))
+    if user_session then
+        ngx.log(ngx.NOTICE, "Checking existing user session: " .. user_session)
+        local okay, session = util.func_call(resolve_session, user_session)
+        if okay and session then
+            local okay, is_valid = util.func_call(validate_token, session)
+            if is_valid then
+                ngx.log(ngx.NOTICE, "User session [" .. user_session .. "] is valid.")
+                return
+            else
+                ngx.log(ngx.NOTICE, "User session[" .. user_session .. "] is NOT valid!")
+                util.delete_cookie(util.cookie_key("Session"))
+            end
+        end
+    end
+
+    util.set_cookies({
+        util.create_cookie({
+            ["Domain"] = "." .. config.cookie_domain,
+            ["Max-Age"] = config.cookie_lifetime,
+            [util.cookie_key("Redirect")] = nginx_furl
+        })
+    })
+
+    ngx.redirect(lsso_login)
 end

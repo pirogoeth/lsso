@@ -124,6 +124,7 @@ function set_cookies(cookies)
     end
 
     for _, v in pairs(cookies) do
+        print("Cookie: " .. v)
         table.insert(cset, v)
     end
     ngx.header["Set-Cookie"] = cset
@@ -136,7 +137,7 @@ function delete_cookie(cookie_name)
     end
 
     for k, v in pairs(cookies) do
-        local name = match(value, "(.-)=")
+        local name = string.match(value, "(.-)=")
         if name == cookie_name then
             table.remove(cookies, key)
         end
