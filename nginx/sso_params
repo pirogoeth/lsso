@@ -1,0 +1,11 @@
+## PLACE IN YOUR NGINX CONFIG DIRECTORY! ##
+
+location /token {
+    proxy_pass http://oauth-server;
+    include proxy_params;
+}
+
+location /checktoken {
+    proxy_pass http://oauth-server;
+    include proxy_params;
+}
