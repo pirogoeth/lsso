@@ -54,5 +54,8 @@ if config.debug_enabled then
         print("Raven: could not parse DSN: " .. err)
         config.debug_enabled = false
     end
+    if config.luasec_params then
+        rvn:set_luasec_params(config.luasec_params)
+    end
     print("Raven: initialized connection to " .. config.debug_dsn)
 end

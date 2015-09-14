@@ -528,6 +528,10 @@ function _M.http_send_core(self, json_str)
    return string_sub(res, s2 + 1)
 end
 
+function _M.set_luasec_params(self, params)
+    self._luasec_params = params
+end
+
 -- lua_wrap_tls: Enables TLS for luasocket. Requires luasec.
 function _M.lua_wrap_tls(self, sock)
    if not ssl then
@@ -536,12 +540,16 @@ function _M.lua_wrap_tls(self, sock)
 
    local ok, err
 
-   sock, err = ssl.wrap(sock, {
-      mode = "client",
-      protocol = "tlsv1",
-      verify = "peer",
-      options = "all",
-   })
+   if self._luasec_params then
+      sock, err = ssl.wrap(sock, self._luasec_params)
+   else
+      sock, err = ssl.wrap(sock, {
+         mode = "client",
+         protocol = "tlsv1",
+         verify = "peer",
+         options = "all",
+      })
+   end
    if not sock then
       return nil, err
    end

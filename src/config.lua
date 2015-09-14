@@ -41,6 +41,14 @@ config = {
     lsso_capture_location = "/auth/verify", -- Endpoint to capture for auth
     lsso_default_redirect = "https://maio.me", -- Endpoint to redirect to when no ?next
 
+    -- LuaSec SSL Settings
+    luasec_params = {
+        mode = "client",
+        protocol = "tlsv1",
+        options = "all",
+        cafile = "/etc/ssl/cert.pem"
+    },
+
     -- Debugging settings
     -- Debugging wraps calls and sends any exceptions to Sentry through Raven.
     debug_enabled = false,
