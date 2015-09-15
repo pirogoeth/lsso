@@ -20,7 +20,9 @@ local lsso_capture = config.lsso_scheme .. "://" .. config.lsso_domain .. config
 local redis_response = nil
 
 nginx_uri = ngx.var.uri
-nginx_furl = ngx.var.scheme .. "://" .. ngx.var.server_name .. ngx.var.request_uri
+nginx_server_name = ngx.var.server_name
+nginx_furl = ngx.var.scheme .. "://" .. nginx_server_name .. ngx.var.request_uri
+nginx_narg_url = ngx.var.scheme .. "://" .. nginx_server_name .. ngx.var.uri
 nginx_client_address = ngx.var.remote_addr
 nginx_client_useragent = ngx.req.get_headers()["User-Agent"]
 
@@ -88,7 +90,6 @@ function session_needs_checkin(user_session)
     local current_time = ngx.now()
 
     if current_time > checkin_time then
-        ngx.log(ngx.NOTICE, "Session " .. user_session .. " is past checkin time")
         return true
     else
         return false
@@ -107,7 +108,7 @@ function check_session(user_session, do_validate)
         -- We need to invalidate this session, it may have been compromised.
         local okay = util.func_call(invalidate_session, user_session)
         if not okay then
-            ngx.log(ngx.WARNING, "Could not invalidate user session!")
+            ngx.log(ngx.NOTICE, "Could not invalidate user session!")
             return false
         end
         -- Essentially, this session is no longer valid.
@@ -117,7 +118,6 @@ function check_session(user_session, do_validate)
     if okay and session and do_validate then
         local okay, is_valid = util.func_call(validate_token, session)
         if is_valid then
-            ngx.log(ngx.NOTICE, "User session [" .. user_session .. "] is valid.")
             return true
         else
             ngx.log(ngx.NOTICE, "User session[" .. user_session .. "] is NOT valid!")
@@ -128,18 +128,43 @@ function check_session(user_session, do_validate)
     return false
 end
 
+function get_cross_domain_base(server_name)
+    for _, v in pairs(config.cookie_cross_domains) do
+        if string.endswith(server_name, v) then
+            return v
+        end
+    end
+
+    return nil
+end
+
+function get_cdk_session(cross_domain_key)
+    -- Resolve a CDK to a session token.
+    local rd_cdk = util.redis_key("CDK:" .. cross_domain_key)
+
+    redis_response = rdc:exists(rd_cdk)
+    if not redis_response then
+        return nil
+    end
+
+    redis_response = rdc:get(rd_cdk)
+    if not redis_response then
+        return nil
+    end
+
+    return redis_response
+end
+
 function get_checkin_time(user_session)
     local rd_checkin_key = util.redis_key("checkin:" .. user_session)
 
     redis_response = rdc:exists(rd_checkin_key)
     if not redis_response then
-        ngx.log(ngx.NOTICE, "User session [" .. user_session .. "] has no session checkin time!")
         return nil
     end
 
     redis_response = rdc:get(rd_checkin_key)
     if not redis_response then
-        ngx.log(ngx.NOTICE, "User session [" .. user_session .. "] has no session checkin time!")
         return nil
     end
 
@@ -150,13 +175,9 @@ function set_checkin_time(user_session, time_secs)
     local rd_checkin_key = util.redis_key("checkin:" .. user_session)
 
     local prev_time = get_checkin_time(user_session)
-    if prev_time then
-        ngx.log(ngx.DEBUG, "Updating session (" .. user_session .. ") checkin time to " .. time_secs .. " from " .. prev_time)
-    end
 
     redis_response = rdc:set(rd_checkin_key, time_secs)
     if not redis_response then
-        ngx.log(ngx.NOTICE, "Setting checkin time failed!")
         return false
     end
 
@@ -173,17 +194,23 @@ function invalidate_session(user_session)
     end)
 end
 
-if nginx_furl == lsso_capture then
+-- This block covers general authentication, situations such as:
+--  - POST to the capture endpoint
+--  - Simple session check-in
+--  - Preparing cross-domain-auth keys on redirect requests from main auth
+
+if nginx_narg_url == lsso_capture then
     local user_session = request_cookie:get(util.cookie_key("Session"))
     local user_redirect = request_cookie:get(util.cookie_key("Redirect"))
+
     if user_session then
         local okay, session_valid = util.func_call(check_session, user_session, true)
         if okay and session_valid then
             -- Anytime the session passes through a full check, we need to do a check-in.
             set_checkin_time(user_session, ngx.now())
+
             -- Check for redirect and do so.
             if user_redirect then
-                ngx.log(ngx.NOTICE, "User redirect: " .. user_redirect)
                 request_cookie:set({
                     key = util.cookie_key("Redirect"),
                     value = "" })
@@ -217,6 +244,7 @@ if nginx_furl == lsso_capture then
     ngx.req.read_body()
     local credentials = ngx.req.get_post_args()
 
+    -- Make sure we have been provided credentials for login.
     if not util.key_in_table(credentials, "user") then
         ngx.redirect(lsso_login) -- XXX - needs error message
     end
@@ -228,9 +256,13 @@ if nginx_furl == lsso_capture then
     -- Create the auth table and convert it to JSON.
     local auth_table = {}
     util.merge_tables(config.oauth_auth_context, auth_table)
+
     auth_table["username"] = ngx.escape_uri(credentials["user"])
     auth_table["password"] = ngx.escape_uri(credentials["password"])
     auth_table = ngx.encode_args(auth_table)
+
+    -- Grab the 'next' field.
+    local next_uri = credentials["next"]
 
     -- Perform the token request.
     ngx.req.set_header("Content-Type", "application/x-www-form-urlencoded")
@@ -239,7 +271,9 @@ if nginx_furl == lsso_capture then
         body = auth_table
     })
 
+    -- Decode the OAuth response and make sure it did not return an error
     local auth_response = cjson.decode(oauth_res.body)
+
     if util.key_in_table(auth_response, "error") then
         -- Auth request failed, process the information and redirect.
         -- XXX - process the auth response
@@ -249,18 +283,8 @@ if nginx_furl == lsso_capture then
     -- Store token information in Redis.
     local session_key = util.generate_random_string(64) -- XXX - make length configurable?
     local session_salt = util.generate_random_string(8) -- Again, configurable length.
-    local rd_sess_key = util.redis_key("session:" .. session_key)
-
-    ngx.log(ngx.NOTICE, "Sending session to client...")
-
-    request_cookie:set({
-        key = util.cookie_key("Session"), 
-        value = session_key,
-        path = "/",
-        domain = "." .. config.cookie_domain,
-        max_age = config.cookie_lifetime })
-
-    local current_time = ngx.now()
+    rd_sess_key = util.redis_key("session:" .. session_key)
+    current_time = ngx.now()
 
     -- Save the session in Redis
     rdc:pipeline(function(p)
@@ -272,30 +296,113 @@ if nginx_furl == lsso_capture then
         p:expire(rd_sess_key, config.cookie_lifetime)
     end)
 
-    -- Set the session checkin time.
-    set_checkin_time(session_key, current_time)
+    -- Check that the request host is a part of the cookie domain
+    if not next_uri then
+        ngx.log(ngx.NOTICE, "Sending session to client...")
 
-    -- XXX - need to do processing here!
-    user_redirect = request_cookie:get(util.cookie_key("Redirect"))
-    if user_redirect then
         request_cookie:set({
-            key = util.cookie_key("Redirect"),
-            value = "",
-            max_age = util.COOKIE_EXPIRY })
-        ngx.redirect(user_redirect)
+            key = util.cookie_key("Session"),
+            value = session_key,
+            path = "/",
+            domain = "." .. config.cookie_domain,
+            max_age = config.cookie_lifetime })
+
+        -- Set the session checkin time.
+        set_checkin_time(session_key, current_time)
+
+        -- XXX - need to do processing here!
+        local user_redirect = request_cookie:get(util.cookie_key("Redirect"))
+        if user_redirect then
+            request_cookie:set({
+                key = util.cookie_key("Redirect"),
+                value = "",
+                max_age = util.COOKIE_EXPIRY })
+            ngx.redirect(user_redirect)
+        else
+            ngx.redirect(config.lsso_default_redirect)
+        end
+    -- Otherwise, prepare for cross-domain authentication.
     else
-        ngx.redirect(config.lsso_default_redirect)
+        next_uri = ngx.decode_base64(next_uri)
+        local base_scheme = nil
+        local base_domain = ngx.re.match(next_uri, "(?<scheme>https?)://(?<base>[^/]+)/", "aosxi")
+
+        if base_domain.base then
+            base_scheme = base_domain.scheme
+            base_domain = base_domain.base
+        end
+
+        -- Make sure the domain is in the list of allowed CDs
+        if not get_cross_domain_base(base_domain) then
+            ngx.log(ngx.NOTICE, "CDA attempted on unlisted domain: " .. base_domain)
+            ngx.redirect(config.lsso_default_redirect)
+        end
+
+        -- Send the session key to the client
+        request_cookie:set({
+            key = util.cookie_key("Session"),
+            value = session_key,
+            path = "/",
+            domain = "." .. config.cookie_domain,
+            max_age = config.cookie_lifetime })
+
+        -- Create a brand new cross-domain auth key.
+        local cross_domain_key = ngx.encode_base64(util.generate_random_string(16)) -- XXX - configurable length?
+        local cross_domain_arg = config.lsso_cross_domain_qs .. "=" .. cross_domain_key
+        local next_uri_arg = "next=" .. ngx.encode_base64(next_uri)
+
+        -- Store the CDK in the user's Redis session
+        rdc:set(util.redis_key("CDK:" .. cross_domain_key), session_key)
+        rdc:expire(util.redis_key("CDK:" .. cross_domain_key), config.cookie_lifetime)
+
+        -- Redirect to the bare base domain with a CDK.
+        local redirect_to = base_scheme .. "://" .. base_domain .. "/?" .. cross_domain_arg .. "&" .. next_uri_arg
+        ngx.redirect(redirect_to)
     end
-elseif nginx_uri ~= lsso_capture then
+elseif nginx_narg_url ~= lsso_capture then
     -- We're at anything other than the auth verification location.
     -- This means that we should check the session and redirect cookie.
     local user_session = request_cookie:get(util.cookie_key("Session"))
     local to_verify = false
-    ngx.log(ngx.NOTICE, "Checking session for redirection to " .. nginx_uri)
+
+    local uri_args = ngx.req.get_uri_args()
+    if util.key_in_table(uri_args, config.lsso_cross_domain_qs) then
+        -- Get the CDK and next url!
+        for k, v in pairs(uri_args) do
+            ngx.log(ngx.NOTICE, "CDK ARG: " .. k .. "~" .. v)
+        end
+
+        local cross_domain_key = uri_args[config.lsso_cross_domain_qs]
+        local next_uri = uri_args["next"]
+        local user_session = get_cdk_session(cross_domain_key)
+
+        if not cross_domain_key or not next_uri or not user_session then
+            ngx.exit(ngx.HTTP_BAD_REQUEST)
+        end
+
+        -- Decode the next_uri..
+        next_uri = ngx.decode_base64(next_uri)
+
+        -- Need to do the cross domain redirection and session setting!
+        request_cookie:set({
+            key = util.cookie_key("Session"),
+            value = user_session,
+            path = "/",
+            domain = "." .. get_cross_domain_base(nginx_server_name),
+            max_age = config.cookie_lifetime })
+
+        local current_time = ngx.now()
+
+        -- Set the session checkin time.
+        set_checkin_time(user_session, current_time)
+
+        -- Finally redirect!
+        ngx.redirect(next_uri)
+    end
+
     if user_session then
         local okay, should_checkin = util.func_call(session_needs_checkin, user_session)
         if okay and should_checkin then
-            -- XXX - redirect back to the capture location for verification
             ngx.log(ngx.NOTICE, "Falling back to VERIFICATION for token check.")
             to_verify = true
         else
@@ -308,18 +415,42 @@ elseif nginx_uri ~= lsso_capture then
         end
     end
 
-    request_cookie:set({
-        key = util.cookie_key("Redirect"),
-        value = nginx_furl,
-        max_age = config.cookie_lifetime,
-        domain = "." .. config.cookie_domain,
-        path = "/" })
+    -- Check for CDA
+    if string.endswith(nginx_server_name, config.cookie_domain) then
+        -- This is on the native domain SSO is served from, no need for CDA.
+        request_cookie:set({
+            key = util.cookie_key("Redirect"),
+            value = nginx_furl,
+            max_age = config.cookie_lifetime,
+            domain = "." .. config.cookie_domain,
+            path = "/" })
+    else
+        -- This is NOT on the native domain. Have to start CDA.
+        local uri_next = ngx.encode_base64(nginx_furl)
+        ngx.req.set_uri_args({
+            ["next"] = uri_next
+        })
+        redirect_arg = "?" .. ngx.var.args
+
+        -- Clear the redirect cookie since we won't be using it.
+        request_cookie:set({
+            key = util.cookie_key("Redirect"),
+            value = "",
+            max_age = util.COOKIE_EXPIRY })
+    end
+
+    if redirect_arg then
+        login_uri = lsso_login .. redirect_arg
+        capture_uri = lsso_capture .. redirect_arg
+    else
+        login_uri = lsso_login
+        capture_uri = lsso_capture
+    end
 
     -- Redirect to SSO login page to auth.
     if to_verify then
-        ngx.log(ngx.NOTICE, "Redirect to capture location for verification: " .. user_session .. " ~> " .. nginx_uri)
-        ngx.redirect(lsso_capture)
+        ngx.redirect(capture_uri)
     else
-        ngx.redirect(lsso_login)
+        ngx.redirect(login_uri)
     end
 end

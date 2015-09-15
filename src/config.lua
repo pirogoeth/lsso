@@ -17,6 +17,10 @@ config = {
     -- Auth cookie settings
     cookie_prefix = "LSSO_",
     cookie_domain = "example.org",
+    cookie_cross_domains = {
+        "example.com",
+        "example-infra.net"
+    }, -- Table of domains that can do cross-domain authentication.
     cookie_lifetime = 21600, -- Lines up with oauth token expiry (value in seconds)
 
     -- Session settings
@@ -40,6 +44,7 @@ config = {
     lsso_login_redirect = "/auth", -- Endpoint to redirect to for auth.
     lsso_capture_location = "/auth/verify", -- Endpoint to capture for auth
     lsso_default_redirect = "https://maio.me", -- Endpoint to redirect to when no ?next
+    lsso_cross_domain_qs = "lsso_session",
 
     -- LuaSec SSL Settings
     luasec_params = {
