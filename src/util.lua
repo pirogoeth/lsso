@@ -10,6 +10,8 @@ module('util', package.seeall)
 local redis = require "redis"
 local socket = require "socket"
 
+-- Useful constants.
+COOKIE_EXPIRY = "Thu, 01 Jan 1970 00:00:00 UTC"
 
 -- Returns if `haystack` starts with `needle`.
 function string.startswith(haystack, needle)
@@ -114,48 +116,4 @@ end
 function get_cookie(cookie_name)
     local cookie = "cookie_" .. cookie_name
     return ngx.var[cookie]
-end
-
-function set_cookies(cookies)
-    local cset = ngx.header["Set-Cookie"] or {}
-
-    if type(cookies) == "string" then
-        cookies = {cookies}
-    end
-
-    for _, v in pairs(cookies) do
-        table.insert(cset, v)
-    end
-
-    ngx.header["Set-Cookie"] = cset
-end
-
-function delete_cookie(cookie_name)
-    local cookies = ngx.header["Set-Cookie"] or {}
-    if type(cookies) == "string" then
-        cookies = {cookies}
-    end
-
-    local expiry = "Expires=Thu, 01 Jan 1970 00:00:00 UTC"
-
-    for k, v in pairs(cookies) do
-        local name = string.match(v, "(.-)=")
-        if name == cookie_name then
-            table.remove(cookies, k)
-            table.insert(cookies, name .. "=; " .. expiry)
-        end
-    end
-
-    ngx.header["Set-Cookie"] = cookies or {}
-end
-
-function create_cookie(key, value, params)
-    local cookie = ""
-    for k, v in pairs(params) do
-        cookie = cookie .. k .. "=" .. v .. "; "
-    end
-
-    cookie = key .. "=" .. value .. "; " .. cookie
-
-    return cookie
 end

@@ -7,6 +7,7 @@
 
 -- External library imports
 local cjson = require "cjson"
+local cookie = require "resty.cookie"
 local raven = require "raven"
 local redis = require "redis"
 
@@ -21,6 +22,9 @@ local redis_response = nil
 nginx_uri = ngx.var.uri
 nginx_furl = ngx.var.scheme .. "://" .. ngx.var.server_name .. ngx.var.request_uri
 nginx_client_address = ngx.var.remote_addr
+nginx_client_useragent = ngx.req.get_headers()["User-Agent"]
+
+request_cookie = cookie:new()
 
 -- Functions for session validation.
 function resolve_session(session_token)
@@ -66,7 +70,7 @@ function validate_token(token_response)
     end
 end
 
-function should_redirect_verify(user_session)
+function session_needs_checkin(user_session)
     -- Returns whether or not we should redirect to the auth endpoint
     -- to validate a users session. This solves intra-domain verification issues.
     local okay, session = util.func_call(resolve_session, user_session)
@@ -84,13 +88,14 @@ function should_redirect_verify(user_session)
     local current_time = ngx.now()
 
     if current_time > checkin_time then
+        ngx.log(ngx.NOTICE, "Session " .. user_session .. " is past checkin time")
         return true
     else
         return false
     end
 end
 
-function check_session(user_session)
+function check_session(user_session, do_validate)
     -- Take a user's session key and use it to validate the session.
     ngx.log(ngx.NOTICE, "Checking existing user session: " .. user_session)
     local okay, session = util.func_call(resolve_session, user_session)
@@ -98,29 +103,25 @@ function check_session(user_session)
         return false
     end
 
-    local _, last_checkin = util.func_call(get_checkin_time, user_session)
-    if not last_checkin then
-        last_checkin = session.created
+    if session.remote_addr ~= nginx_client_address then
+        -- We need to invalidate this session, it may have been compromised.
+        local okay = util.func_call(invalidate_session, user_session)
+        if not okay then
+            ngx.log(ngx.WARNING, "Could not invalidate user session!")
+            return false
+        end
+        -- Essentially, this session is no longer valid.
+        return false
     end
 
-    if okay and session then
-        if ((last_checkin + config.session_checkin) < ngx.now()) then
-            local okay, is_valid = util.func_call(validate_token, session)
-            if is_valid then
-                ngx.log(ngx.NOTICE, "User session [" .. user_session .. "] is valid.")
-                return true
-            else
-                ngx.log(ngx.NOTICE, "User session[" .. user_session .. "] is NOT valid!")
-                return false
-            end
-        else
-            -- Have not hit the checkin time yet.
-            local okay, set_success = util.func_call(set_checkin_time, user_session, ngx.now())
-            if not okay or not set_success then
-                ngx.log(ngx.NOTICE, "Could not set checkin time: " .. user_session)
-            end
-            ngx.log(ngx.NOTICE, "User session [" .. user_session .. "] has resolved, passing")
+    if okay and session and do_validate then
+        local okay, is_valid = util.func_call(validate_token, session)
+        if is_valid then
+            ngx.log(ngx.NOTICE, "User session [" .. user_session .. "] is valid.")
             return true
+        else
+            ngx.log(ngx.NOTICE, "User session[" .. user_session .. "] is NOT valid!")
+            return false
         end
     end
 
@@ -162,26 +163,54 @@ function set_checkin_time(user_session, time_secs)
     return true
 end
 
-if nginx_furl == lsso_capture then
-    if ngx.req.get_method() ~= "POST" then
-        ngx.redirect(lsso_login)
-    end
+function invalidate_session(user_session)
+    local rd_session_key = util.redis_key("session:" .. user_session)
+    local rd_checkin_key = util.redis_key("checkin:" .. user_session)
 
-    user_session = util.get_cookie(util.cookie_key("Session"))
+    rdc:pipeline(function(p)
+        p:del(rd_session_key)
+        p:del(rd_checkin_key)
+    end)
+end
+
+if nginx_furl == lsso_capture then
+    local user_session = request_cookie:get(util.cookie_key("Session"))
+    local user_redirect = request_cookie:get(util.cookie_key("Redirect"))
     if user_session then
-        local okay, session_valid = util.func_call(check_session, user_session)
+        local okay, session_valid = util.func_call(check_session, user_session, true)
         if okay and session_valid then
-            user_redirect = util.get_cookie(util.cookie_key("Redirect"))
+            -- Anytime the session passes through a full check, we need to do a check-in.
+            set_checkin_time(user_session, ngx.now())
+            -- Check for redirect and do so.
             if user_redirect then
-                util.delete_cookie(util.cookie_key("Redirect"))
+                ngx.log(ngx.NOTICE, "User redirect: " .. user_redirect)
+                request_cookie:set({
+                    key = util.cookie_key("Redirect"),
+                    value = "" })
                 ngx.redirect(user_redirect)
             else
                 ngx.redirect(config.lsso_default_redirect)
             end
         elseif not session_valid then
-            util.delete_cookie(util.cookie_key("Session"))
-            util.delete_cookie(util.cookie_key("Redirect"))
+            request_cookie:set({
+                key = util.cookie_key("Session"),
+                value = "",
+                max_age = util.COOKIE_EXPIRY })
+            request_cookie:set({
+                key = util.cookie_key("Redirect"),
+                value = "",
+                max_age = util.COOKIE_EXPIRY })
+            if user_redirect then
+                -- Session was invalidated and a redirect was attempted.
+                -- Reset the cookies and redirect to login.
+                ngx.redirect(lsso_login)
+            end
         end
+    end
+
+    -- Past the initial session routine, we need to enforce POST access only.
+    if ngx.req.get_method() ~= "POST" then
+        ngx.redirect(lsso_login)
     end
 
     -- Since we're here, this should be a POST request with a username and password.
@@ -219,68 +248,77 @@ if nginx_furl == lsso_capture then
 
     -- Store token information in Redis.
     local session_key = util.generate_random_string(64) -- XXX - make length configurable?
+    local session_salt = util.generate_random_string(8) -- Again, configurable length.
     local rd_sess_key = util.redis_key("session:" .. session_key)
 
-    util.set_cookies({
-        util.create_cookie(util.cookie_key("Session"), session_key, {
-            ["Path"] = "/",
-            ["Domain"] = "." .. config.cookie_domain,
-            ["Max-Age"] = config.cookie_lifetime
-        })
-    })
+    ngx.log(ngx.NOTICE, "Sending session to client...")
+
+    request_cookie:set({
+        key = util.cookie_key("Session"), 
+        value = session_key,
+        path = "/",
+        domain = "." .. config.cookie_domain,
+        max_age = config.cookie_lifetime })
 
     local current_time = ngx.now()
 
+    -- Save the session in Redis
     rdc:pipeline(function(p)
         p:hset(rd_sess_key, "username", credentials["user"])
         p:hset(rd_sess_key, "token", auth_response.access_token)
         p:hset(rd_sess_key, "created", current_time)
         p:hset(rd_sess_key, "remote_addr", nginx_client_address)
+        p:hset(rd_sess_key, "salt", session_salt)
         p:expire(rd_sess_key, config.cookie_lifetime)
     end)
 
+    -- Set the session checkin time.
     set_checkin_time(session_key, current_time)
 
     -- XXX - need to do processing here!
-    user_redirect = util.get_cookie(util.cookie_key("Redirect"))
+    user_redirect = request_cookie:get(util.cookie_key("Redirect"))
     if user_redirect then
-        util.delete_cookie(util.cookie_key("Redirect"))
+        request_cookie:set({
+            key = util.cookie_key("Redirect"),
+            value = "",
+            max_age = util.COOKIE_EXPIRY })
         ngx.redirect(user_redirect)
     else
         ngx.redirect(config.lsso_default_redirect)
     end
-elseif nginx_uri ~= config.lsso_capture_location then
+elseif nginx_uri ~= lsso_capture then
     -- We're at anything other than the auth verification location.
     -- This means that we should check the session and redirect cookie.
-    local user_session = util.get_cookie(util.cookie_key("Session"))
+    local user_session = request_cookie:get(util.cookie_key("Session"))
     local to_verify = false
+    ngx.log(ngx.NOTICE, "Checking session for redirection to " .. nginx_uri)
     if user_session then
-        local okay, session_valid = util.func_call(check_session, user_session)
-        if okay and session_valid then
-            local okay, should_checkin = util.func_call(should_redirect_verify, user_session)
-            if okay and should_checkin then
-                -- XXX - redirect back to the capture location for verification
-                to_verify = true
-            else
-                return -- Allow access phase to continue
-            end
-        elseif not session_valid then
-            util.delete_cookie(util.cookie_key("Session"))
-            util.delete_cookie(util.cookie_key("Redirect"))
+        local okay, should_checkin = util.func_call(session_needs_checkin, user_session)
+        if okay and should_checkin then
+            -- XXX - redirect back to the capture location for verification
+            ngx.log(ngx.NOTICE, "Falling back to VERIFICATION for token check.")
+            to_verify = true
+        else
+            ngx.log(ngx.NOTICE, "Falling back to access phase.")
+            request_cookie:set({
+                key = util.cookie_key("Redirect"),
+                value = "",
+                max_age = util.COOKIE_EXPIRY })
+            return -- Allow access phase to continue
         end
     end
 
-    util.set_cookies({
-        util.create_cookie(util.cookie_key("Redirect"), nginx_furl, {
-            ["Max-Age"] = config.cookie_lifetime,
-            ["Domain"] = "." .. config.cookie_domain,
-            ["Path"] = "/"
-        })
-    })
+    request_cookie:set({
+        key = util.cookie_key("Redirect"),
+        value = nginx_furl,
+        max_age = config.cookie_lifetime,
+        domain = "." .. config.cookie_domain,
+        path = "/" })
 
     -- Redirect to SSO login page to auth.
     if to_verify then
-        ngx.redirect(lsso_capture_location)
+        ngx.log(ngx.NOTICE, "Redirect to capture location for verification: " .. user_session .. " ~> " .. nginx_uri)
+        ngx.redirect(lsso_capture)
     else
         ngx.redirect(lsso_login)
     end
