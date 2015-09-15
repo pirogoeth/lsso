@@ -11,7 +11,7 @@ local redis = require "redis"
 local socket = require "socket"
 
 -- Useful constants.
-COOKIE_EXPIRY = "Thu, 01 Jan 1970 00:00:00 UTC"
+COOKIE_EXPIRED = "Thu, 01 Jan 1970 00:00:00 UTC"
 
 -- Returns if `haystack` starts with `needle`.
 function string.startswith(haystack, needle)
