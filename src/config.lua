@@ -33,9 +33,9 @@ config = {
     -- Adjust as needed. Need to be on lsso_domain.
     oauth_auth_endpoint = "/token", -- Endpoint used for retrieving tokens
     oauth_token_endpoint = "/checktoken", -- Endpoint used for checking tokens
+    oauth_auth_scope = "sso",
     oauth_auth_context = {
-        grant_type = "password",
-        scope = "ALL"
+        grant_type = "password"
     }, -- Additional static parameters that will be passed to the auth endpoint
 
     -- Location settings

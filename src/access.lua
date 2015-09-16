@@ -54,7 +54,7 @@ function validate_token(token_response)
     local token_table = {
         access_token = token,
         username = username,
-        scope = "ALL"
+        scope = config.oauth_auth_scope,
     }
     token_table = ngx.encode_args(token_table)
 
