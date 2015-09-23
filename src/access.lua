@@ -306,6 +306,11 @@ if nginx_narg_url == lsso_capture then
     -- Create the auth table and convert it to JSON.
     local auth_table = {}
     util.merge_tables(config.oauth_auth_context, auth_table)
+    if config.oauth_auth_scope then
+        util.merge_tables({
+            scope = config.oauth_auth_scope
+        }, auth_table)
+    end
 
     auth_table["username"] = ngx.escape_uri(credentials["user"])
     auth_table["password"] = ngx.escape_uri(credentials["password"])
