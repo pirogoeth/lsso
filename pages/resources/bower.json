@@ -1,0 +1,24 @@
+{
+  "name": "lsso-pages-resources",
+  "version": "0.1.0",
+  "authors": [
+    "Sean Johnson <pirogoeth@maio.me>"
+  ],
+  "description": "Resources for LSSO pages.",
+  "moduleType": [
+    "globals"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/maiome-development/lsso",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "bootstrap": "~3.3.5",
+    "flat-ui": "~2.2.2"
+  }
+}

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>maiome sso</title>
+
+    <!-- Responsive -->
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1" />
+
+    <!-- Do NOT index SSO pages. -->
+    <meta name="robots" content="noindex, nofollow">
+
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="/resources/bower_components/bootstrap/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/resources/bower_components/flat-ui/dist/css/flat-ui.min.css">
+    <link rel="stylesheet" href="/resources/summit-min.css">
+
+    <!-- Javascript. -->
+    <script type="text/javascript" src="/resources/bower_components/jquery/dist/jquery.min.js"></script>
+    <script type="text/javascript">
+      function attachOnLoad(func) {
+        if (window.attachEvent) {
+          window.attachEvent('onload', func);
+        } else {
+          if (window.onload) {
+            var curronload = window.onload;
+            var newonload = function () {
+              curronload();
+              func();
+            };
+            window.onload = newonload;
+          } else {
+            window.onload = func;
+          }
+        }
+      }
+
+      function attachObjectEvent(selector, events, func) {
+        element = $(selector);
+        element.on(events, func);
+      };
+
+      function addElementToNav(elementSelector, callback) {
+        nav = $("#nav");
+        element = $(elementSelector);
+        nav.append(element);
+        if (callback) {
+          callback(element);
+        }
+      };
+
+      function duplicateElement(elementSelector, clearValue) {
+        if (!(clearValue)) {
+          clearValue = true;
+        }
+        element = $(elementSelector);
+        dupe = element.clone();
+        if (clearValue) {
+          dupe.val("");
+        }
+        element.after(dupe);
+        return dupe;
+      };
+
+      function makeVisible(element) {
+        $(element).show();
+      };
+
+      function getParameterByName(name) {
+        name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
+        var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
+          results = regex.exec(location.search);
+        return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
+      };
+
+      function toggleDropdown(selector) {
+        element = $(selector);
+        if (element.hasClass("dropdown")) {
+          if (element.hasClass("open")) {
+            element.removeClass("open");
+          } else {
+            element.addClass("open");
+          }
+        }
+      };
+
+      function appendNextPath() {
+        parent = $("form.login-form");
+        nextUri = getParameterByName("next");
+        if (nextUri == "") {
+            return;
+        }
+        child = document.createElement("input");
+        child.type = "hidden";
+        child.name = "next";
+        child.id = "next";
+        child.value = nextUri;
+        parent.append(child);
+      };
+
+      attachOnLoad(appendNextPath);
+    </script>
+  </head>
+  <body>
+    <div class="container">
+      <div class="row">
+        <nav id="nav" class="navbar navbar-inverse navbar-embossed" role="navigation">
+          <div class="navbar-header">
+            <a class="logo-wrapper navbar-brand" href="#">maiome sso</a>
+          </div>
+        </nav>
+      </div>
+
+      <div id="alert-container" class="row">
+      </div>
+
+      <div class="col-xs-10 col-xs-offset-1 wrapper form-box">
+        <form class="login-form" name="input" action="/auth/verify" method="post">
+          <div class="row">
+            <div class="col-xs-12">
+              <div class="form-group">
+                <input id="user" type="text" name="user" placeholder="Username" class="form-control login-field" required>
+                <label class="login-field-icon fui-user" for="user"></label>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-xs-12">
+              <div class="form-group">
+                <input id="password" type="password" name="password" placeholder="Password" class="form-control login-field" required>
+                <label class="login-field-icon fui-lock" for="password"></label>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-xs-10 col-xs-offset-1">
+              <input type="submit" value="Log In" class="btn btn-block btn-lg btn-success">
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+    <script type="text/javascript" src="/resources/bower_components/bootstrap/dist/js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="/resources/bower_components/flat-ui/dist/js/flat-ui.min.js"></script>
+  </body>
+</html>

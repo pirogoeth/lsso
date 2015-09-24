@@ -1,0 +1,59 @@
+@import url('https://fonts.googleapis.com/css?family=Roboto+Condensed|Roboto');
+
+html {
+    min-height: 100%;
+    padding-top: 20px;
+    background-color: #f2f1ef;
+    font-weight: 400;
+    font-size: 1em;
+    font-family: 'Roboto', sans-serif;
+    line-height: 2em;
+    padding-bottom: 1em;
+}
+
+body {
+    background-color: #f2f1ef;
+    margin-top: 15px;
+    max-height: 98%;
+    width: 98%;
+    margin: 0 auto;
+}
+
+@font-face {
+    font-family: 'Lobster';
+    font-style: normal;
+    font-weight: 1000;
+    src: local('Lobster'), url('https://themes.googleusercontent.com/static/fonts/lobster/v6/MWVf-Rwh4GLQVBEwbyI61Q.woff') format('woff');
+}
+
+.logo-wrapper {
+    color: #95a5a6 !important;
+    font-family: 'Lobster';
+    font-size: 20px;
+    width: 100%;
+    text-decoration: none;
+    vertical-align: middle;
+    text-align: center;
+}
+
+.form-box {
+    color: #34495e !important;
+    padding: 38px !important;
+/*    background: #95a5a6 !important; */
+    background-color: #d2d7d3 !important;
+    border-radius: 6px !important;
+}
+
+.navbar-inverse {
+/*    background-color: #6c7a89 !important; */
+    background-color: #d2d7d3 !important;
+}
+
+.navbar-nav > li > a {
+    color: #95a5a6 !important;
+}
+
+span.account-uid {
+    color: #abc1da !important;
+    padding: 8px;
+}
