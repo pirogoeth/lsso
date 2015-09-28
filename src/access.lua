@@ -239,7 +239,7 @@ if nginx_narg_url == lsso_capture then
                 request_cookie:set({
                     key = util.cookie_key("Redirect"),
                     value = "",
-                    max_age = util.COOKIE_EXPIRED
+                    expires = util.COOKIE_EXPIRED
                 })
 
                 -- Generate a CDK and append to next_url
@@ -260,7 +260,7 @@ if nginx_narg_url == lsso_capture then
                 request_cookie:set({
                     key = util.cookie_key("Redirect"),
                     value = "",
-                    max_age = util.COOKIE_EXPIRED
+                    expires = util.COOKIE_EXPIRED
                 })
                 ngx.redirect(user_redirect)
             else
@@ -270,12 +270,12 @@ if nginx_narg_url == lsso_capture then
             request_cookie:set({
                 key = util.cookie_key("Session"),
                 value = "",
-                max_age = util.COOKIE_EXPIRED
+                expires = util.COOKIE_EXPIRED
             })
             request_cookie:set({
                 key = util.cookie_key("Redirect"),
                 value = "",
-                max_age = util.COOKIE_EXPIRED
+                expires = util.COOKIE_EXPIRED
             })
             if user_redirect then
                 -- Session was invalidated and a redirect was attempted.
@@ -370,7 +370,7 @@ if nginx_narg_url == lsso_capture then
             request_cookie:set({
                 key = util.cookie_key("Redirect"),
                 value = "",
-                max_age = util.COOKIE_EXPIRED
+                expires = util.COOKIE_EXPIRED
             })
             ngx.redirect(user_redirect)
         else
@@ -382,7 +382,7 @@ if nginx_narg_url == lsso_capture then
         request_cookie:set({
             key = util.cookie_key("Redirect"),
             value = "",
-            max_age = util.COOKIE_EXPIRED
+            expires = util.COOKIE_EXPIRED
         })
 
         -- Process the ?next= qs
@@ -442,7 +442,7 @@ elseif nginx_narg_url ~= lsso_capture then
         request_cookie:set({
             key = util.cookie_key("Redirect"),
             value = "",
-            max_age = util.COOKIE_EXPIRED
+            expires = util.COOKIE_EXPIRED
         })
 
         -- Set the session in the client.
@@ -480,7 +480,7 @@ elseif nginx_narg_url ~= lsso_capture then
             request_cookie:set({
                 key = util.cookie_key("Redirect"),
                 value = "",
-                max_age = util.COOKIE_EXPIRED
+                expires = util.COOKIE_EXPIRED
             })
             return -- Allow access phase to continue
         end
@@ -508,7 +508,7 @@ elseif nginx_narg_url ~= lsso_capture then
         request_cookie:set({
             key = util.cookie_key("Redirect"),
             value = "",
-            max_age = util.COOKIE_EXPIRED
+            expires = util.COOKIE_EXPIRED
         })
 
         -- Redirect to the verification endpoint for CDA processing.
