@@ -95,6 +95,22 @@ function merge_tables(from, onto)
     return onto
 end
 
+function table_tostring(tbl)
+    s = ""
+    for k, v in pairs(tbl) do
+        if type(k) ~= "string" then
+            k = tostring(k)
+        end
+        if type(v) == "table" then
+            s = s .. "; " .. k .. " -> " table_tostring(v)
+        else
+            s = s .. "; " .. k .. " -> " .. tostring(v)
+        end
+    end
+
+    return s
+end
+
 -- Function wrapper for Raven.
 function func_call(func, ...)
     if config.debug_enabled then

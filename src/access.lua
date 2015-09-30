@@ -238,7 +238,7 @@ if nginx_narg_url == lsso_capture then
                 next_url = ngx.decode_base64(next_url)
                 request_cookie:set({
                     key = util.cookie_key("Redirect"),
-                    value = "",
+                    value = "nil",
                     expires = util.COOKIE_EXPIRED
                 })
 
@@ -259,7 +259,7 @@ if nginx_narg_url == lsso_capture then
             if user_redirect then
                 request_cookie:set({
                     key = util.cookie_key("Redirect"),
-                    value = "",
+                    value = "nil",
                     expires = util.COOKIE_EXPIRED
                 })
                 ngx.redirect(user_redirect)
@@ -269,12 +269,12 @@ if nginx_narg_url == lsso_capture then
         elseif not session_valid then
             request_cookie:set({
                 key = util.cookie_key("Session"),
-                value = "",
+                value = "nil",
                 expires = util.COOKIE_EXPIRED
             })
             request_cookie:set({
                 key = util.cookie_key("Redirect"),
-                value = "",
+                value = "nil",
                 expires = util.COOKIE_EXPIRED
             })
             if user_redirect then
@@ -369,7 +369,7 @@ if nginx_narg_url == lsso_capture then
         if user_redirect then
             request_cookie:set({
                 key = util.cookie_key("Redirect"),
-                value = "",
+                value = "nil",
                 expires = util.COOKIE_EXPIRED
             })
             ngx.redirect(user_redirect)
@@ -381,7 +381,7 @@ if nginx_narg_url == lsso_capture then
         -- Make sure there is no redirect cookie...
         request_cookie:set({
             key = util.cookie_key("Redirect"),
-            value = "",
+            value = "nil",
             expires = util.COOKIE_EXPIRED
         })
 
@@ -441,7 +441,7 @@ elseif nginx_narg_url ~= lsso_capture then
         -- Again, ensure there is no redirection cookie.
         request_cookie:set({
             key = util.cookie_key("Redirect"),
-            value = "",
+            value = "nil",
             expires = util.COOKIE_EXPIRED
         })
 
@@ -479,7 +479,7 @@ elseif nginx_narg_url ~= lsso_capture then
         else
             request_cookie:set({
                 key = util.cookie_key("Redirect"),
-                value = "",
+                value = "nil",
                 expires = util.COOKIE_EXPIRED
             })
             return -- Allow access phase to continue
@@ -507,7 +507,7 @@ elseif nginx_narg_url ~= lsso_capture then
         -- Clear the redirect cookie since we won't be using it.
         request_cookie:set({
             key = util.cookie_key("Redirect"),
-            value = "",
+            value = "nil",
             expires = util.COOKIE_EXPIRED
         })
 
