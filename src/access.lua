@@ -218,6 +218,14 @@ if nginx_narg_url == lsso_capture then
     local user_session = request_cookie:get(util.cookie_key("Session"))
     local user_redirect = request_cookie:get(util.cookie_key("Redirect"))
 
+    if user_session == "nil" then
+        user_session = nil
+    end
+
+    if user_redirect == "nil" then
+        user_redirect = nil
+    end
+
     if user_session then
         local okay, session_valid = util.func_call(check_session, user_session, true)
         if okay and session_valid then
@@ -283,6 +291,10 @@ if nginx_narg_url == lsso_capture then
                 ngx.redirect(lsso_login)
             end
         end
+    else
+        -- There is no session cookie for this user.
+        -- Check for ?next args for initial CDA process.
+
     end
 
     -- Past the initial session routine, we need to enforce POST access only.
@@ -425,6 +437,10 @@ elseif nginx_narg_url ~= lsso_capture then
     local user_session = request_cookie:get(util.cookie_key("Session"))
     local to_verify = false
 
+    if user_session == "nil" then
+        user_session = nil
+    end
+
     local uri_args = ngx.req.get_uri_args()
     if util.key_in_table(uri_args, config.lsso_cross_domain_qs) then
         -- Get the CDK and next url!
@@ -510,9 +526,6 @@ elseif nginx_narg_url ~= lsso_capture then
             value = "nil",
             expires = util.COOKIE_EXPIRED
         })
-
-        -- Redirect to the verification endpoint for CDA processing.
-        to_verify = true
     end
 
     if redirect_arg then
@@ -523,7 +536,7 @@ elseif nginx_narg_url ~= lsso_capture then
         capture_uri = lsso_capture
     end
 
-    -- Redirect to SSO logiin page to auth.
+    -- Redirect to SSO login page to auth.
     if (to_verify and redirect_arg) or to_verify then
         ngx.redirect(capture_uri)
     else
