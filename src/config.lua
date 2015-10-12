@@ -64,6 +64,8 @@ config = {
     msg_no_user_field = "Missing parameter: user",
     msg_no_pw_field = "Missing parameter: password",
     msg_no_access = "Please log in to access this resource.",
+    msg_no_permission = "You do not have permission to access this resource.",
+    msg_error = "Something happened while processing request data. Clear your cookies and try again.",
 
     -- Debugging settings
     -- Debugging wraps calls and sends any exceptions to Sentry through Raven.

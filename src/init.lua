@@ -27,6 +27,9 @@ dofile(config_path)
 rdc = nil -- Redis client
 rvn = nil -- Raven client
 
+-- Scope mapping global table.
+scopes = {}
+
 -- Initialize Redis
 rdc = redis.connect(config.redis_address, config.redis_port)
 local redis_response = nil

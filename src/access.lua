@@ -23,6 +23,7 @@ nginx_furl = ngx.var.scheme .. "://" .. nginx_server_name .. ngx.var.request_uri
 nginx_narg_url = ngx.var.scheme .. "://" .. nginx_server_name .. ngx.var.uri
 nginx_client_address = ngx.var.remote_addr
 nginx_client_useragent = ngx.req.get_headers()["User-Agent"]
+nginx_location_scope = ngx.var.lsso_location_scope
 
 lsso_logging_context = {
     context = "logging",
@@ -145,11 +146,6 @@ if nginx_narg_url == lsso_capture then
     -- Create the auth table and convert it to JSON.
     local auth_table = {}
     util.merge_tables(config.oauth_auth_context, auth_table)
-    if config.oauth_auth_scope then
-        util.merge_tables({
-            scope = config.oauth_auth_scope
-        }, auth_table)
-    end
 
     auth_table["username"] = ngx.escape_uri(credentials["user"])
     auth_table["password"] = ngx.escape_uri(credentials["password"])
@@ -157,6 +153,29 @@ if nginx_narg_url == lsso_capture then
 
     -- Grab the 'next' field.
     local next_uri = credentials["next"]
+
+    -- Do scope processing magic.
+    if nginx_location_scope then
+        local user_redirect = request_cookie:get(util.cookie_key("Redirect"))
+        local base_domain, err = ngx.re.match(user_redirect, "(?<scheme>https?)://(?<base>[^/]+)/", "aosxi")
+        if err then
+            util.auth_log("Something happened while processing user's auth request.", lsso_logging_content)
+            local redir_uri = session.encode_return_message(lsso_login, "error", config.msg_error)
+            ngx.redirect(redir_uri)
+        end
+        if not util.key_in_table(scopes, base_domain) then
+            util.merge_tables({
+                [base_domain] = nginx_location_scope,
+            }, scopes)
+        end
+        util.merge_tables({
+            scope = nginx_location_scope
+        }, auth_table)
+    elseif config.oauth_auth_scope then
+        util.merge_tables({
+            scope = config.oauth_auth_scope
+        }, auth_table)
+    end
 
     -- Perform the token request.
     ngx.req.set_header("Content-Type", "application/x-www-form-urlencoded")
@@ -170,7 +189,7 @@ if nginx_narg_url == lsso_capture then
 
     if util.key_in_table(auth_response, "error") then
         -- Auth request failed, process the information and redirect.
-        -- XXX - process the auth response
+        -- XXX - process the auth response, check for invalid_scope, invalid_grant, unauthorized_client, etc
         util.auth_log("Received error from OAuth backend: " .. oauth_res.body)
         local redir_uri = session.encode_return_message(lsso_login, "error", config.msg_bad_credentials)
         ngx.redirect(redir_uri)
@@ -275,6 +294,19 @@ elseif nginx_narg_url ~= lsso_capture then
 
     if user_session == "nil" then
         user_session = nil
+    end
+
+    -- Check for a set location scope.
+    if not util.key_in_table(scopes, nginx_server_name) then
+        if nginx_location_scope then
+            util.merge_tables({
+                [nginx_server_name] = nginx_location_scope
+            }, scopes)
+        else
+            util.merge_tables({
+                [nginx_server_name] = config.oauth_auth_scope
+            }, scopes)
+        end
     end
 
     local uri_args = ngx.req.get_uri_args()
