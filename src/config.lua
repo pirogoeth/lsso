@@ -54,6 +54,13 @@ config = {
         cafile = "/etc/ssl/cert.pem"
     },
 
+    -- Auth messages
+    msg_bad_credentials = "Invalid username or password.",
+    msg_bad_session = "Session is invalid. Please log in again.",
+    msg_no_user_field = "Missing parameter: user",
+    msg_no_pw_field = "Missing parameter: password",
+    msg_no_access = "Please log in to access this resource.",
+
     -- Debugging settings
     -- Debugging wraps calls and sends any exceptions to Sentry through Raven.
     debug_enabled = false,

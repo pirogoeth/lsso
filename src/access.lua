@@ -209,6 +209,24 @@ function invalidate_session(user_session)
     end)
 end
 
+function encode_return_message(target_url, message_type, message_reason)
+    -- Takes a URL and appends an encoded message embedded in the query params.
+    -- Example:
+    --   Given these params:
+    --     target_url      => http://sso.example.com/auth
+    --     message_type    => error
+    --     message_reason  => An error occurred while processing your credentials.
+    --   The function will return a new URL that looks like-ish:
+    --     http://sso.example.com/auth?error=QW4gZXJyb3Igb2NjdXJyZWQgd2hpbGUgcHJvY2Vzc2luZyB5b3VyIGNyZWRlbnRpYWxzLg==
+
+    local msg_reason = ngx.encode_base64(message_reason)
+    ngx.req.set_uri_args({
+        [message_type] = msg_reason
+    })
+
+    return target_url .. "?" .. ngx.var.args
+end
+
 -- This block covers general authentication, situations such as:
 --  - POST to the capture endpoint
 --  - Simple session check-in
@@ -288,13 +306,10 @@ if nginx_narg_url == lsso_capture then
             if user_redirect then
                 -- Session was invalidated and a redirect was attempted.
                 -- Reset the cookies and redirect to login.
-                ngx.redirect(lsso_login)
+                local redir_uri = encode_return_message(lsso_login, "error", config.msg_bad_session)
+                ngx.redirect(redir_uri)
             end
         end
-    else
-        -- There is no session cookie for this user.
-        -- Check for ?next args for initial CDA process.
-
     end
 
     -- Past the initial session routine, we need to enforce POST access only.
@@ -308,11 +323,13 @@ if nginx_narg_url == lsso_capture then
 
     -- Make sure we have been provided credentials for login.
     if not util.key_in_table(credentials, "user") then
-        ngx.redirect(lsso_login) -- XXX - needs error message
+        local redir_uri = encode_return_message(lsso_login, "error", config.msg_no_user_field)
+        ngx.redirect(redir_uri)
     end
 
     if not util.key_in_table(credentials, "password") then
-        ngx.redirect(lsso_login) -- XXX - needs error message
+        local redir_uri = encode_return_message(lsso_login, "error", config.msg_no_pw_field)
+        ngx.redirect(redir_uri)
     end
 
     -- Create the auth table and convert it to JSON.
@@ -344,7 +361,8 @@ if nginx_narg_url == lsso_capture then
     if util.key_in_table(auth_response, "error") then
         -- Auth request failed, process the information and redirect.
         -- XXX - process the auth response
-        ngx.redirect(lsso_login) -- XXX - needs error message
+        local redir_uri = encode_return_message(lsso_login, "error", config.msg_bad_credentials)
+        ngx.redirect(redir_uri)
     end
 
     -- Store token information in Redis.
@@ -450,7 +468,8 @@ elseif nginx_narg_url ~= lsso_capture then
 
         if not cross_domain_key or not user_session then
             ngx.log(ngx.WARN, "No CDK or user session found!")
-            ngx.redirect(lsso_login)
+            local redir_uri = encode_return_message(lsso_login, "error", config.msg_no_access)
+            ngx.redirect(redir_uri)
         end
 
         -- Need to do the cross domain redirection and session setting!

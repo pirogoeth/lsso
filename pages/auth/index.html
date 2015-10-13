@@ -19,6 +19,9 @@
     <!-- Javascript. -->
     <script type="text/javascript" src="/resources/bower_components/jquery/dist/jquery.min.js"></script>
     <script type="text/javascript">
+      // Nice "little" cross-browser base64 implementation.
+      var base64={_keyStr:"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=",encode:function(r){var t,e,o,a,h,n,d,C="",c=0;for(r=base64._utf8_encode(r);c<r.length;)t=r.charCodeAt(c++),e=r.charCodeAt(c++),o=r.charCodeAt(c++),a=t>>2,h=(3&t)<<4|e>>4,n=(15&e)<<2|o>>6,d=63&o,isNaN(e)?n=d=64:isNaN(o)&&(d=64),C=C+this._keyStr.charAt(a)+this._keyStr.charAt(h)+this._keyStr.charAt(n)+this._keyStr.charAt(d);return C},decode:function(r){var t,e,o,a,h,n,d,C="",c=0;for(r=r.replace(/[^A-Za-z0-9\+\/\=]/g,"");c<r.length;)a=this._keyStr.indexOf(r.charAt(c++)),h=this._keyStr.indexOf(r.charAt(c++)),n=this._keyStr.indexOf(r.charAt(c++)),d=this._keyStr.indexOf(r.charAt(c++)),t=a<<2|h>>4,e=(15&h)<<4|n>>2,o=(3&n)<<6|d,C+=String.fromCharCode(t),64!=n&&(C+=String.fromCharCode(e)),64!=d&&(C+=String.fromCharCode(o));return C=base64._utf8_decode(C)},_utf8_encode:function(r){r=r.replace(/\r\n/g,"\n");for(var t="",e=0;e<r.length;e++){var o=r.charCodeAt(e);128>o?t+=String.fromCharCode(o):o>127&&2048>o?(t+=String.fromCharCode(o>>6|192),t+=String.fromCharCode(63&o|128)):(t+=String.fromCharCode(o>>12|224),t+=String.fromCharCode(o>>6&63|128),t+=String.fromCharCode(63&o|128))}return t},_utf8_decode:function(r){for(var t="",e=0,o=0,a=0;e<r.length;)o=r.charCodeAt(e),128>o?(t+=String.fromCharCode(o),e++):o>191&&224>o?(a=r.charCodeAt(e+1),t+=String.fromCharCode((31&o)<<6|63&a),e+=2):(a=r.charCodeAt(e+1),c3=r.charCodeAt(e+2),t+=String.fromCharCode((15&o)<<12|(63&a)<<6|63&c3),e+=3);return t}};
+
       function attachOnLoad(func) {
         if (window.attachEvent) {
           window.attachEvent('onload', func);
@@ -99,7 +102,29 @@
         parent.append(child);
       };
 
+      function displayAuthMessages() {
+        parent = $("div#alert-container");
+        cur_alert = getParameterByName("error");
+        alert_type = "danger";
+        if (cur_alert == "") {
+          cur_alert = getParameterByName("info");
+          if (cur_alert == "") {
+            return;
+          } else {
+            alert_type = "info";
+          }
+        }
+        alert = document.createElement("div");
+        message = document.createTextNode(base64.decode(cur_alert));
+        alert.setAttribute("role", "alert");
+        alert.name = "auth_alert";
+        alert.className = "alert alert-" + alert_type;
+        alert.appendChild(message);
+        parent.append(alert);
+      }
+
       attachOnLoad(appendNextPath);
+      attachOnLoad(displayAuthMessages);
     </script>
   </head>
   <body>
