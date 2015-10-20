@@ -24,7 +24,16 @@ nginx_server_name = ngx.var.server_name
 nginx_furl = ngx.var.scheme .. "://" .. nginx_server_name .. ngx.var.request_uri
 nginx_narg_url = ngx.var.scheme .. "://" .. nginx_server_name .. ngx.var.uri
 nginx_client_address = ngx.var.remote_addr
+ngx.log(ngx.NOTICE, "Client request address: " .. nginx_client_address)
 nginx_client_useragent = ngx.req.get_headers()["User-Agent"]
+
+lsso_logging_context = {
+    context = "logging",
+    remote_addr = nginx_client_address,
+    remote_ua = nginx_client_useragent,
+    request_url = nginx_furl,
+    req_id = util.generate_random_string(16)
+}
 
 request_cookie = cookie:new()
 
@@ -306,6 +315,7 @@ if nginx_narg_url == lsso_capture then
             if user_redirect then
                 -- Session was invalidated and a redirect was attempted.
                 -- Reset the cookies and redirect to login.
+                util.session_log("Attempted access from bad session: " .. user_session, lsso_logging_context)
                 local redir_uri = encode_return_message(lsso_login, "error", config.msg_bad_session)
                 ngx.redirect(redir_uri)
             end
@@ -323,11 +333,13 @@ if nginx_narg_url == lsso_capture then
 
     -- Make sure we have been provided credentials for login.
     if not util.key_in_table(credentials, "user") then
+        util.auth_log("Attempted login without `user` field.", lsso_logging_context)
         local redir_uri = encode_return_message(lsso_login, "error", config.msg_no_user_field)
         ngx.redirect(redir_uri)
     end
 
     if not util.key_in_table(credentials, "password") then
+        util.auth_log("Attempted login without `password` field.", lsso_logging_context)
         local redir_uri = encode_return_message(lsso_login, "error", config.msg_no_pw_field)
         ngx.redirect(redir_uri)
     end
@@ -361,8 +373,12 @@ if nginx_narg_url == lsso_capture then
     if util.key_in_table(auth_response, "error") then
         -- Auth request failed, process the information and redirect.
         -- XXX - process the auth response
+        util.auth_log("Received error from OAuth backend: " .. oauth_res.body)
         local redir_uri = encode_return_message(lsso_login, "error", config.msg_bad_credentials)
         ngx.redirect(redir_uri)
+    else
+        -- Success. Log it!
+        util.auth_log("Auth success: " .. credentials["user"], lsso_logging_context)
     end
 
     -- Store token information in Redis.
@@ -370,6 +386,8 @@ if nginx_narg_url == lsso_capture then
     local session_salt = util.generate_random_string(8) -- Again, configurable length.
     rd_sess_key = util.redis_key("session:" .. session_key)
     current_time = ngx.now()
+
+    util.session_log("Created new session: " .. session_key, lsso_logging_context)
 
     -- Save the session in Redis
     rdc:pipeline(function(p)
@@ -510,6 +528,7 @@ elseif nginx_narg_url ~= lsso_capture then
     if user_session then
         local okay, should_checkin = util.func_call(session_needs_checkin, user_session)
         if okay and should_checkin then
+            util.session_log("Sending user to verify for checkin: " .. user_session, lsso_logging_context)
             to_verify = true
         else
             request_cookie:set({

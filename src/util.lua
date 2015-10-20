@@ -7,6 +7,7 @@
 module('util', package.seeall)
 
 -- External library imports
+local cjson = require "cjson"
 local redis = require "redis"
 local socket = require "socket"
 
@@ -21,6 +22,11 @@ end
 -- Returns if `haystack` ends with `needle`.
 function string.endswith(haystack, needle)
     return needle == "" or string.sub(haystack, -(string.len(needle))) == needle
+end
+
+-- Packs a table.
+function table.pack(...)
+    return { n = select("#", ...), ... }
 end
 
 -- Custom Redis client commands and callbacks.
@@ -118,6 +124,75 @@ function func_call(func, ...)
     else
         return pcall(func, ...)
     end
+end
+
+-- Function calls to simplify Redis logging.
+-- Parameters:
+--   log_facility - (ie., auth, session) part of the list key (lsso:log:auth)
+--   ... - lines to log to Redis
+function log_redis(log_facility, ...)
+    local args = table.pack(...)
+    local log_key = redis_key("log:" .. log_facility)
+    local message_meta = {
+        timestamp = ngx.now(),
+        phase = ngx.get_phase()
+    }
+    for i=1, args.n do
+        local arg = args[i]
+        if type(arg) == "table" then
+            if arg["context"] == "logging" then
+                -- This is addition logging context, merge to meta.
+                merge_tables(arg, message_meta)
+                args[i] = nil
+                break
+            end
+        end
+    end
+    if ngx.status ~= nil then
+        -- There *should* be an active request going now.
+        merge_tables({
+            request = {
+                status = ngx.status,
+                uri = ngx.var.uri,
+                method = ngx.req.get_method(),
+                headers = ngx.req.get_headers()
+            }
+        }, message_meta)
+    end
+    local replies = rdc:pipeline(function(redis_pipe)
+        for i=1, args.n do
+            if args[i] == nil then
+                goto continue
+            end
+            local message_data = {
+                message = args[i]
+            }
+            merge_tables(message_meta, message_data)
+            message_data = cjson.encode(message_data)
+            func_call(redis_pipe.rpush, rdc, log_key, message_data)
+            ::continue::
+        end
+    end)
+
+    return replies
+end
+
+-- Wrapper function for log_redis("auth", ...)
+function auth_log(...)
+    if not config.auth_logging then
+        return nil
+    end
+
+    return log_redis("auth", ...)
+end
+
+-- Wrapper function for log_redis("session", ...)
+function session_log(...)
+    if not config.session_logging then
+        return nil
+    end
+
+    return log_redis("session", ...)
 end
 
 -- Convenience functions for Redis keys and cookies
