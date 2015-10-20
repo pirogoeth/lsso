@@ -24,7 +24,6 @@ nginx_server_name = ngx.var.server_name
 nginx_furl = ngx.var.scheme .. "://" .. nginx_server_name .. ngx.var.request_uri
 nginx_narg_url = ngx.var.scheme .. "://" .. nginx_server_name .. ngx.var.uri
 nginx_client_address = ngx.var.remote_addr
-ngx.log(ngx.NOTICE, "Client request address: " .. nginx_client_address)
 nginx_client_useragent = ngx.req.get_headers()["User-Agent"]
 
 lsso_logging_context = {
