@@ -13,6 +13,7 @@ Features:
  - Backend session store in Redis
  - Auth and session event logging to Redis
 
+
 Requirements
 ============
 
@@ -44,6 +45,8 @@ Roadmap
 
 - [ ] More documentation!
 - [ ] HTTP Basic authentication support for endpoints.
+- [ ] Per-location auth scoping (customizable scopes for each protected location: `set $lsso_location_scope 'admin';` before `access_by_lua_file`)
+- [ ] Status portal (with *content_by_lua_file* and [luatache](https://github.com/Olivine-Labs/lustache))
 - [ ] Some user-facing endpoints for managing sessions:
   - [ ] /auth/revoke - to revoke the current token / session
   - [ ] /auth/logout - a more graceful way of doing the above..?
