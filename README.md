@@ -31,6 +31,7 @@ Installation
 
 - Clone this repo..
 - Copy external/\* to your lua5.1 package dir (/usr/local/share/lua/5.1/ or similar)
+- Install [lustache](https://github.com/Olivine-Labs/lustache) to your lua5.1 package dir (see above)
 - Use the file from `nginx/sso-init.conf` to set up the main nginx conf.
 - Use the template from `nginx/sso-site.conf` to set up your SSO endpoint.
 - Grab the src/config.lua, configure it, and stick it where you want
@@ -51,11 +52,12 @@ Roadmap
   - [ ] /auth/logout - a more graceful way of doing the above..?
 - [ ] Stats collection for info about user sessions, login attempts, page accesses (?)
   - [ ] Stats export via statsd for aggregation (?)
-- [ ] Log viewer endpoints (?)
-  - [ ] /log/auth - view prettified auth event log
-  - [ ] /log/session - view prettified session event log
+- [X] Log viewer endpoints (*access_by_lua_file* and *content_by_lua_file* | w/ [lustach](https://github.com/Olivine-Labs/lustache))
+  - [X] /log/auth - view prettified auth event log
+  - [X] /log/session - view prettified session event log
 - [ ] Implement SAML 2.0 authentication
 - [ ] Use JWT cookie instead of set of unsigned cookies (? | [lua-resty-jwt](https://github.com/SkyLothar/lua-resty-jwt))
+
 
 Contributing
 ============

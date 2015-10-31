@@ -1,0 +1,38 @@
+{{> header}}
+  <div class="row table-responsive">
+    <table class="table table-striped">
+      <tr>
+        <th>Timestamp</th>
+        <th>Method</th>
+        <th>URL</th>
+        <th>Remote Address</th>
+      </tr>
+    {{#logs}}
+      <tr onclick="toggleVisible('tr#data-{{req_id}}');">
+        <td id="ts">{{timestamp}}</td>
+        <td>{{request.method}}</td>
+        <td>{{request.uri}}</td>
+        <td>{{remote_addr}}</td>
+      </tr>
+      <tr id="data-{{req_id}}" class="hidden">
+        <td colspan=4>
+          <pre>
+            <code>
+{{_raw}}
+            </code>
+          </pre>
+        </td>
+      </tr>
+    {{/logs}}
+    {{^logs}}
+      <tr>
+        <td>No data to display :(</td>
+        <td></td>
+        <td></td>
+        <td></td>
+      </tr>
+    {{/logs}}
+    </table>
+  </div>
+  {{! paginator goes here! }}
+{{> footer}}

@@ -36,7 +36,7 @@ lsso_logging_context = {
     remote_ua = nginx_client_useragent,
     request_url = nginx_furl,
     request_scope = nginx_location_scope,
-    req_id = util.generate_random_string(16),
+    req_id = util.strip_bad_req_chars(util.generate_random_string(16))
 }
 
 request_cookie = cookie:new()
@@ -210,6 +210,8 @@ if nginx_narg_url == lsso_capture then
     auth_table["username"] = ngx.escape_uri(credentials["user"])
     auth_table["password"] = ngx.escape_uri(credentials["password"])
 
+    lsso_logging_context["username"] = auth_table["username"]
+
     -- Grab the 'next' field.
     local next_uri = credentials["next"]
     if next_uri then
@@ -250,7 +252,7 @@ if nginx_narg_url == lsso_capture then
 
     if util.key_in_table(auth_response, "error") then
         -- Auth request failed, process the information and redirect.
-        util.auth_log("Received error from OAuth backend: " .. oauth_res.body)
+        util.auth_log("Received error from OAuth backend: " .. oauth_res.body, lsso_logging_context)
         if auth_response["error"] == "invalid_scope" then
             local redir_uri = session.encode_return_message(lsso_login, "error", config.msg_no_permission)
             ngx.redirect(redir_uri)
@@ -378,6 +380,8 @@ elseif nginx_narg_url ~= lsso_capture then
         end
     end
 
+    lsso_logging_context["session"] = user_session
+
     local uri_args = ngx.req.get_uri_args()
     if util.key_in_table(uri_args, config.lsso_cross_domain_qs) then
         -- Get the CDK and next url!
@@ -390,6 +394,9 @@ elseif nginx_narg_url ~= lsso_capture then
             local redir_uri = session.encode_return_message(lsso_login, "error", config.msg_no_access)
             ngx.redirect(redir_uri)
         end
+
+        lsso_logging_context["cross-domain"] = cross_domain_key
+        lsso_logging_context["session"] = user_session
 
         -- Need to do the cross domain redirection and session setting!
         -- Again, ensure there is no redirection cookie.

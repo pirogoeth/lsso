@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>{{config.portal_title}}</title>
+
+    <!-- Responsive -->
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1" />
+
+    <!-- Do NOT index SSO pages. -->
+    <meta name="robots" content="noindex, nofollow">
+
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="{{config.portal_resources_uri}}/bower_components/bootstrap/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{{config.portal_resources_uri}}/bower_components/flat-ui/dist/css/flat-ui.min.css">
+    <link rel="stylesheet" href="{{config.portal_resources_uri}}/summit-min.css">
+
+    <!-- Javascript. -->
+    <script type="text/javascript" src="{{config.portal_resources_uri}}/bower_components/jquery/dist/jquery.min.js"></script>
+    <script type="text/javascript">
+      function attachOnLoad(func) {
+        if (window.attachEvent) {
+          window.attachEvent('onload', func);
+        } else {
+          if (window.onload) {
+            var curronload = window.onload;
+            var newonload = function () {
+              curronload();
+              func();
+            };
+            window.onload = newonload;
+          } else {
+            window.onload = func;
+          }
+        }
+      }
+
+      function attachObjectEvent(selector, events, func) {
+        element = $(selector);
+        element.on(events, func);
+      };
+
+      function addElementToNav(elementSelector, callback) {
+        nav = $("#nav");
+        element = $(elementSelector);
+        nav.append(element);
+        if (callback) {
+          callback(element);
+        }
+      };
+
+      function duplicateElement(elementSelector, clearValue) {
+        if (!(clearValue)) {
+          clearValue = true;
+        }
+        element = $(elementSelector);
+        dupe = element.clone();
+        if (clearValue) {
+          dupe.val("");
+        }
+        element.after(dupe);
+        return dupe;
+      };
+
+      function toggleVisible(element) {
+        if ($(element).hasClass("hidden")) {
+          $(element).removeClass("hidden");
+          $(element).show();
+        } else {
+          $(element).addClass("hidden");
+          $(element).hide();
+        }
+      }
+
+      function prettifyJSON(element) {
+        pretty = JSON.stringify($(element).text(), null, '  ');
+        $(element).text(pretty);
+      }
+
+      function getParameterByName(name) {
+        name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
+        var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
+          results = regex.exec(location.search);
+        return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
+      };
+
+      function logs_resolveTimestamps() {
+        elements = $("tr td#ts");
+        for (idx = 0; idx < elements.length; idx++) {
+          element = $(elements[idx]);
+          ts = element.text();
+          ts = parseFloat(ts);
+          ts *= 1000;
+          dt = new Date(ts).toISOString();
+          element.text(dt);
+        }
+      };
+
+      function logs_prettifyJSON() {
+        elements = $("tr td pre code");
+        for (idx = 0; idx < elements.length; idx++) {
+          element = $(elements[idx]);
+          json = element.text();
+          element.text(JSON.stringify(JSON.parse(json), undefined, 2));
+        }
+      };
+
+      attachOnLoad(logs_resolveTimestamps);
+      attachOnLoad(logs_prettifyJSON);
+    </script>
+  </head>
+  <body>
+    <div class="container">
+      <div class="row">
+        <nav id="nav" class="navbar navbar-inverse navbar-embossed" role="navigation">
+          <div class="navbar-header">
+            <a class="logo-wrapper navbar-brand" href="#">maiome sso</a>
+          </div>
+        </nav>
+      </div>

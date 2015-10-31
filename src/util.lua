@@ -8,6 +8,7 @@ module('util', package.seeall)
 
 -- External library imports
 local cjson = require "cjson"
+local lfs = require "lfs"
 local redis = require "redis"
 local socket = require "socket"
 
@@ -62,6 +63,17 @@ function generate_random_string(length)
     return s
 end
 
+-- Strips characters that can't be processed easily in certain JS/CSS statements.
+function strip_bad_req_chars(str)
+    if not str then
+        return ""
+    end
+
+    s = string.gsub(str, "[+/#?$><[]@&%*.,!=()^'\";|]", "")
+
+    return s
+end
+
 -- Checks if a table contains a key.
 function key_in_table(tabsrc, key)
     for k, v in pairs(tabsrc) do
@@ -108,9 +120,9 @@ function table_tostring(tbl)
             k = tostring(k)
         end
         if type(v) == "table" then
-            s = s .. "; " .. k .. " -> " table_tostring(v)
+            s = k .. " -> { " .. table_tostring(v) .. " } ; " .. s
         else
-            s = s .. "; " .. k .. " -> " .. tostring(v)
+            s = k .. " -> " .. tostring(v) .. " ; " .. s
         end
     end
 
@@ -230,4 +242,39 @@ end
 
 function unprot_table_get(tbl, val)
     return tbl[val]
+end
+
+-- Functions for loading and managing templates
+function load_templates(template_path)
+    if not template_path then
+        return nil
+    end
+
+    templates = {}
+
+    for file in lfs.dir(template_path) do
+        local fpath = template_path .. "/" .. file
+        local fattr = lfs.attributes(fpath)
+        if fattr.mode ~= "file" then
+            goto continue
+        end
+
+        local fmatch = string.match(file, "^(.+).mustache$")
+        if fmatch then
+            local fd = io.open(fpath, 'r')
+            if not fd then
+                goto continue
+            end
+
+            local fcontent = fd:read("*all")
+            fd:close()
+
+            merge_tables({
+                [fmatch] = fcontent
+            }, templates)
+        end
+        ::continue::
+    end
+
+    return templates
 end

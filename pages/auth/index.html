@@ -77,17 +77,6 @@
         return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
       };
 
-      function toggleDropdown(selector) {
-        element = $(selector);
-        if (element.hasClass("dropdown")) {
-          if (element.hasClass("open")) {
-            element.removeClass("open");
-          } else {
-            element.addClass("open");
-          }
-        }
-      };
-
       function appendNextPath() {
         parent = $("form.login-form");
         nextUri = getParameterByName("next");

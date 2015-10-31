@@ -70,6 +70,13 @@ config = {
     msg_error = "Something happened while processing request data. Clear your cookies and try again.",
     msg_upstream_error = "Could not communicate with upstream...Try again later.",
 
+    -- Portal settings!
+    -- These settings are effective for the logging and future status endpoints only.
+    portal_title = "example sso",
+    portal_resources_uri = "/resources", -- No trailing slash! Path to load web resources from.
+    portal_templates_path = "/root/lsso/templates",
+    portal_partials_path = "/root/lsso/templates/partials",
+
     -- Debugging settings
     -- Debugging wraps calls and sends any exceptions to Sentry through Raven.
     debug_enabled = false,

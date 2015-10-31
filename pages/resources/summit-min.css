@@ -3,7 +3,7 @@
 html {
     min-height: 100%;
     padding-top: 20px;
-    background-color: #f2f1ef;
+    background-color: #32292f;
     font-weight: 400;
     font-size: 1em;
     font-family: 'Roboto', sans-serif;
@@ -12,7 +12,7 @@ html {
 }
 
 body {
-    background-color: #f2f1ef;
+    background-color: #32292f;
     margin-top: 15px;
     max-height: 98%;
     width: 98%;
@@ -27,7 +27,7 @@ body {
 }
 
 .logo-wrapper {
-    color: #95a5a6 !important;
+    color: #575366 !important;
     font-family: 'Lobster';
     font-size: 20px;
     width: 100%;
@@ -44,6 +44,16 @@ body {
     border-radius: 6px !important;
 }
 
+.login-form {
+    background-color: #edeff1 !important;
+}
+
+.motd-box {
+    color: #575366 !important;
+    background-color: #d2d7d3;
+    border-radius: 6px;
+}
+
 .navbar-inverse {
 /*    background-color: #6c7a89 !important; */
     background-color: #d2d7d3 !important;
@@ -56,4 +66,27 @@ body {
 span.account-uid {
     color: #abc1da !important;
     padding: 8px;
+}
+
+.button-wrapper {
+    background-color: #8fbb99 !important;
+    border-color: #81e979 !important;
+    color: #34495e !important;
+    transition: color .5s linear;
+}
+
+.button-wrapper:hover {
+    color: #c6ddf0 !important;
+}
+
+.table-striped > tbody > tr {
+    color: #c6ddf0 !important;
+}
+
+.table-striped > tbody > tr:nth-of-type(2n+1) {
+    background-color: #996888 !important;
+}
+
+tr > td > pre > code {
+    color: #34495e !important;
 }
