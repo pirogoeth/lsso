@@ -8,16 +8,14 @@
 -- External library imports
 local cjson = require "cjson"
 local cookie = require "resty.cookie"
-local raven = require "raven"
-local redis = require "redis"
 
 -- Internal library imports
+local session = require "session"
 local util = require "util"
 
 -- Some shorthand.
 local lsso_login = config.lsso_scheme .. "://" .. config.lsso_domain .. config.lsso_login_redirect
 local lsso_capture = config.lsso_scheme .. "://" .. config.lsso_domain .. config.lsso_capture_location
-local redis_response = nil
 
 nginx_uri = ngx.var.uri
 nginx_server_name = ngx.var.server_name
@@ -35,205 +33,6 @@ lsso_logging_context = {
 }
 
 request_cookie = cookie:new()
-
--- Functions for session validation.
-function resolve_session(session_token)
-    -- Resolve a session token to an auth token.
-    local rd_sess_key = util.redis_key("session:" .. session_token)
-
-    redis_response = rdc:exists(rd_sess_key)
-    if not redis_response then
-        return nil
-    end
-
-    redis_response = rdc:hgetall(rd_sess_key)
-    if not redis_response then
-        return nil
-    end
-
-    return redis_response
-end
-
-function validate_token(token_response)
-    -- Take a response from resolve_session() and validate with oauth server.
-    local token = token_response.token
-    local username = token_response.username
-
-    local token_table = {
-        access_token = token,
-        username = username,
-        scope = config.oauth_auth_scope,
-    }
-    token_table = ngx.encode_args(token_table)
-
-    ngx.req.set_header("Content-Type", "application/x-www-form-urlencoded")
-    local okay, oauth_res = util.func_call(ngx.location.capture, config.oauth_token_endpoint, {
-        method = ngx.HTTP_POST,
-        body = token_table
-    })
-
-    local response_status = oauth_res.status
-    if response_status ~= 200 then
-        return false
-    else
-        return true
-    end
-end
-
-function session_needs_checkin(user_session)
-    -- Returns whether or not we should redirect to the auth endpoint
-    -- to validate a users session. This solves intra-domain verification issues.
-    local okay, session = util.func_call(resolve_session, user_session)
-    if not okay or not session then
-        return true
-    end
-
-    local _, last_checkin = util.func_call(get_checkin_time, user_session)
-    if not last_checkin then
-        last_checkin = session.created
-        set_checkin_time(user_session, last_checkin)
-    end
-
-    local checkin_time = last_checkin + config.session_checkin
-    local current_time = ngx.now()
-
-    if current_time > checkin_time then
-        return true
-    else
-        return false
-    end
-end
-
-function check_session(user_session, do_validate)
-    -- Take a user's session key and use it to validate the session.
-    local okay, session = util.func_call(resolve_session, user_session)
-    if not okay or not session then
-        return false
-    end
-
-    if session.remote_addr ~= nginx_client_address then
-        -- We need to invalidate this session, it may have been compromised.
-        local okay = util.func_call(invalidate_session, user_session)
-        if not okay then
-            ngx.log(ngx.NOTICE, "Could not invalidate user session!")
-            return false
-        end
-        -- Essentially, this session is no longer valid.
-        return false
-    end
-
-    if okay and session and do_validate then
-        local okay, is_valid = util.func_call(validate_token, session)
-        if is_valid then
-            return true
-        else
-            ngx.log(ngx.NOTICE, "User session [" .. user_session .. "] is NOT valid!")
-            return false
-        end
-    end
-
-    return false
-end
-
-function get_cross_domain_base(server_name)
-    for _, v in pairs(config.cookie_cross_domains) do
-        if string.endswith(server_name, v) then
-            return v
-        end
-    end
-
-    return nil
-end
-
-function create_cdk_session(user_session)
-    -- Create a brand new cross-domain auth key.
-    local cross_domain_key = ngx.encode_base64(util.generate_random_string(16)) -- XXX - configurable length?
-    local rd_cdk = util.redis_key("CDK:" .. cross_domain_key)
-
-    -- Store the CDK in the user's Redis session
-    redis_response = rdc:set(rd_cdk, user_session)
-    if not redis_response then
-        return nil
-    end
-
-    rdc:expire(rd_cdk, config.cookie_lifetime)
-
-    return cross_domain_key
-end
-
-function get_cdk_session(cross_domain_key)
-    -- Resolve a CDK to a session token.
-    local rd_cdk = util.redis_key("CDK:" .. cross_domain_key)
-
-    redis_response = rdc:exists(rd_cdk)
-    if not redis_response then
-        return nil
-    end
-
-    redis_response = rdc:get(rd_cdk)
-    if not redis_response then
-        return nil
-    end
-
-    return redis_response
-end
-
-function get_checkin_time(user_session)
-    local rd_checkin_key = util.redis_key("checkin:" .. user_session)
-
-    redis_response = rdc:exists(rd_checkin_key)
-    if not redis_response then
-        return nil
-    end
-
-    redis_response = rdc:get(rd_checkin_key)
-    if not redis_response then
-        return nil
-    end
-
-    return redis_response
-end
-
-function set_checkin_time(user_session, time_secs)
-    local rd_checkin_key = util.redis_key("checkin:" .. user_session)
-
-    local prev_time = get_checkin_time(user_session)
-
-    redis_response = rdc:set(rd_checkin_key, time_secs)
-    if not redis_response then
-        return false
-    end
-
-    return true
-end
-
-function invalidate_session(user_session)
-    local rd_session_key = util.redis_key("session:" .. user_session)
-    local rd_checkin_key = util.redis_key("checkin:" .. user_session)
-
-    rdc:pipeline(function(p)
-        p:del(rd_session_key)
-        p:del(rd_checkin_key)
-    end)
-end
-
-function encode_return_message(target_url, message_type, message_reason)
-    -- Takes a URL and appends an encoded message embedded in the query params.
-    -- Example:
-    --   Given these params:
-    --     target_url      => http://sso.example.com/auth
-    --     message_type    => error
-    --     message_reason  => An error occurred while processing your credentials.
-    --   The function will return a new URL that looks like-ish:
-    --     http://sso.example.com/auth?error=QW4gZXJyb3Igb2NjdXJyZWQgd2hpbGUgcHJvY2Vzc2luZyB5b3VyIGNyZWRlbnRpYWxzLg==
-
-    local msg_reason = ngx.encode_base64(message_reason)
-    ngx.req.set_uri_args({
-        [message_type] = msg_reason
-    })
-
-    return target_url .. "?" .. ngx.var.args
-end
 
 -- This block covers general authentication, situations such as:
 --  - POST to the capture endpoint
@@ -253,10 +52,10 @@ if nginx_narg_url == lsso_capture then
     end
 
     if user_session then
-        local okay, session_valid = util.func_call(check_session, user_session, true)
+        local okay, session_valid = util.func_call(session.check_session, user_session, true)
         if okay and session_valid then
             -- Anytime the session passes through a full check, we need to do a check-in.
-            set_checkin_time(user_session, ngx.now())
+            session.set_checkin_time(user_session, ngx.now())
 
             -- Check for ?next= in URI, as that takes precedence over redirects.
             local uri_args = ngx.req.get_uri_args()
@@ -277,7 +76,7 @@ if nginx_narg_url == lsso_capture then
                 })
 
                 -- Generate a CDK and append to next_url
-                local cross_domain_key = create_cdk_session(user_session)
+                local cross_domain_key = session.create_cdk_session(user_session)
                 local cross_domain_arg = "?" .. config.lsso_cross_domain_qs .. "=" .. cross_domain_key
 
                 -- Redirect to our next CDA location!
@@ -315,7 +114,7 @@ if nginx_narg_url == lsso_capture then
                 -- Session was invalidated and a redirect was attempted.
                 -- Reset the cookies and redirect to login.
                 util.session_log("Attempted access from bad session: " .. user_session, lsso_logging_context)
-                local redir_uri = encode_return_message(lsso_login, "error", config.msg_bad_session)
+                local redir_uri = session.encode_return_message(lsso_login, "error", config.msg_bad_session)
                 ngx.redirect(redir_uri)
             end
         end
@@ -333,13 +132,13 @@ if nginx_narg_url == lsso_capture then
     -- Make sure we have been provided credentials for login.
     if not util.key_in_table(credentials, "user") then
         util.auth_log("Attempted login without `user` field.", lsso_logging_context)
-        local redir_uri = encode_return_message(lsso_login, "error", config.msg_no_user_field)
+        local redir_uri = session.encode_return_message(lsso_login, "error", config.msg_no_user_field)
         ngx.redirect(redir_uri)
     end
 
     if not util.key_in_table(credentials, "password") then
         util.auth_log("Attempted login without `password` field.", lsso_logging_context)
-        local redir_uri = encode_return_message(lsso_login, "error", config.msg_no_pw_field)
+        local redir_uri = session.encode_return_message(lsso_login, "error", config.msg_no_pw_field)
         ngx.redirect(redir_uri)
     end
 
@@ -373,7 +172,7 @@ if nginx_narg_url == lsso_capture then
         -- Auth request failed, process the information and redirect.
         -- XXX - process the auth response
         util.auth_log("Received error from OAuth backend: " .. oauth_res.body)
-        local redir_uri = encode_return_message(lsso_login, "error", config.msg_bad_credentials)
+        local redir_uri = session.encode_return_message(lsso_login, "error", config.msg_bad_credentials)
         ngx.redirect(redir_uri)
     else
         -- Success. Log it!
@@ -410,7 +209,7 @@ if nginx_narg_url == lsso_capture then
         })
 
         -- Set the session checkin time.
-        set_checkin_time(session_key, current_time)
+        session.set_checkin_time(session_key, current_time)
 
         -- XXX - need to do processing here!
         local user_redirect = request_cookie:get(util.cookie_key("Redirect"))
@@ -444,7 +243,7 @@ if nginx_narg_url == lsso_capture then
         end
 
         -- Make sure the domain is in the list of allowed CDs
-        if not get_cross_domain_base(base_domain) then
+        if not session.get_cross_domain_base(base_domain) then
             ngx.log(ngx.NOTICE, "CDA attempted on unlisted domain: " .. base_domain)
             ngx.redirect(config.lsso_default_redirect)
         end
@@ -460,7 +259,7 @@ if nginx_narg_url == lsso_capture then
         })
 
         -- Get a CDK and set up the next_uri
-        local cross_domain_key = create_cdk_session(session_key)
+        local cross_domain_key = session.create_cdk_session(session_key)
         local cross_domain_arg = config.lsso_cross_domain_qs .. "=" .. cross_domain_key
         local next_uri_arg = "next=" .. ngx.encode_base64(next_uri)
 
@@ -483,11 +282,11 @@ elseif nginx_narg_url ~= lsso_capture then
         -- Get the CDK and next url!
         local cross_domain_key = uri_args[config.lsso_cross_domain_qs]
         local next_uri = uri_args["next"]
-        local user_session = get_cdk_session(cross_domain_key)
+        local user_session = session.get_cdk_session(cross_domain_key)
 
         if not cross_domain_key or not user_session then
             ngx.log(ngx.WARN, "No CDK or user session found!")
-            local redir_uri = encode_return_message(lsso_login, "error", config.msg_no_access)
+            local redir_uri = session.encode_return_message(lsso_login, "error", config.msg_no_access)
             ngx.redirect(redir_uri)
         end
 
@@ -505,14 +304,14 @@ elseif nginx_narg_url ~= lsso_capture then
             key = util.cookie_key("Session"),
             value = user_session,
             path = "/",
-            domain = "." .. get_cross_domain_base(nginx_server_name),
+            domain = "." .. session.get_cross_domain_base(nginx_server_name),
             expires = ngx.cookie_time(expire_at)
         })
 
         local current_time = ngx.now()
 
         -- Set the session checkin time.
-        set_checkin_time(user_session, current_time)
+        session.set_checkin_time(user_session, current_time)
 
         -- If there is no next_uri, strip the CDK arg off the current URL and redirect.
         if not next_uri and cross_domain_key then
@@ -528,7 +327,7 @@ elseif nginx_narg_url ~= lsso_capture then
     end
 
     if user_session then
-        local okay, should_checkin = util.func_call(session_needs_checkin, user_session)
+        local okay, should_checkin = util.func_call(session.session_needs_checkin, user_session)
         if okay and should_checkin then
             util.session_log("Sending user to verify for checkin: " .. user_session, lsso_logging_context)
             to_verify = true
