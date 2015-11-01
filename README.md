@@ -52,7 +52,7 @@ Roadmap
   - [ ] /auth/logout - a more graceful way of doing the above..?
 - [ ] Stats collection for info about user sessions, login attempts, page accesses (?)
   - [ ] Stats export via statsd for aggregation (?)
-- [X] Log viewer endpoints (*access_by_lua_file* and *content_by_lua_file* | w/ [lustach](https://github.com/Olivine-Labs/lustache))
+- [X] Log viewer endpoints (*access_by_lua_file* and *content_by_lua_file* | w/ [lustache](https://github.com/Olivine-Labs/lustache))
   - [X] /log/auth - view prettified auth event log
   - [X] /log/session - view prettified session event log
 - [ ] Implement SAML 2.0 authentication
