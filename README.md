@@ -55,7 +55,7 @@ Roadmap
 - [ ] Log viewer endpoints (?)
   - [ ] /log/auth - view prettified auth event log
   - [ ] /log/session - view prettified session event log
-
+- [ ] Implement SAML 2.0 authentication
 
 Contributing
 ============
