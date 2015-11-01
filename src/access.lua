@@ -400,12 +400,13 @@ if nginx_narg_url == lsso_capture then
 
     -- Check that the request host is a part of the cookie domain
     if not next_uri then
+        local expire_at = ngx.time() + config.cookie_lifetime
         request_cookie:set({
             key = util.cookie_key("Session"),
             value = session_key,
             path = "/",
             domain = "." .. config.cookie_domain,
-            max_age = config.cookie_lifetime
+            expires = ngx.cookie_time(expire_at)
         })
 
         -- Set the session checkin time.
@@ -449,12 +450,13 @@ if nginx_narg_url == lsso_capture then
         end
 
         -- Send the session key to the client
+        local expire_at = ngx.time() + config.cookie_lifetime
         request_cookie:set({
             key = util.cookie_key("Session"),
             value = session_key,
             path = "/",
             domain = "." .. config.cookie_domain,
-            max_age = config.cookie_lifetime
+            expires = ngx.cookie_time(expire_at)
         })
 
         -- Get a CDK and set up the next_uri
@@ -498,12 +500,13 @@ elseif nginx_narg_url ~= lsso_capture then
         })
 
         -- Set the session in the client.
+        local expire_at = ngx.time() + config.cookie_lifetime
         request_cookie:set({
             key = util.cookie_key("Session"),
             value = user_session,
             path = "/",
             domain = "." .. get_cross_domain_base(nginx_server_name),
-            max_age = config.cookie_lifetime
+            expires = ngx.cookie_time(expire_at)
         })
 
         local current_time = ngx.now()
@@ -542,12 +545,13 @@ elseif nginx_narg_url ~= lsso_capture then
     -- Check for CDA
     if string.endswith(nginx_server_name, config.cookie_domain) then
         -- This is on the native domain SSO is served from, no need for CDA.
+        local expire_at = ngx.time() + config.cookie_lifetime
         request_cookie:set({
             key = util.cookie_key("Redirect"),
             value = nginx_furl,
-            max_age = config.cookie_lifetime,
             domain = "." .. config.cookie_domain,
-            path = "/"
+            path = "/",
+            expires = ngx.cookie_time(expire_at)
         })
     else
         -- This is NOT on the native domain. Have to start CDA.
