@@ -48,7 +48,6 @@ Roadmap
 - [ ] Per-location auth scoping (customizable scopes for each protected location: `set $lsso_location_scope 'admin';` before `access_by_lua_file`)
 - [ ] Status portal (with *content_by_lua_file* and [lustache](https://github.com/Olivine-Labs/lustache))
 - [ ] Some user-facing endpoints for managing sessions:
-  - [ ] /auth/revoke - to revoke the current token / session
   - [ ] /auth/logout - a more graceful way of doing the above..?
 - [ ] Stats collection for info about user sessions, login attempts, page accesses (?)
   - [ ] Stats export via statsd for aggregation (?)
@@ -56,6 +55,7 @@ Roadmap
   - [ ] /log/auth - view prettified auth event log
   - [ ] /log/session - view prettified session event log
 - [ ] Implement SAML 2.0 authentication
+- [ ] Use JWT cookie instead of set of unsigned cookies (? | [lua-resty-jet](https://github.com/SkyLothar/lua-resty-jwt))
 
 Contributing
 ============
