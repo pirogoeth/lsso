@@ -149,7 +149,6 @@ if nginx_narg_url == lsso_capture then
 
     auth_table["username"] = ngx.escape_uri(credentials["user"])
     auth_table["password"] = ngx.escape_uri(credentials["password"])
-    auth_table = ngx.encode_args(auth_table)
 
     -- Grab the 'next' field.
     local next_uri = credentials["next"]
@@ -177,6 +176,9 @@ if nginx_narg_url == lsso_capture then
         }, auth_table)
     end
 
+    -- Encode the auth_table as qs args
+    auth_table = ngx.encode_args(auth_table)
+
     -- Perform the token request.
     ngx.req.set_header("Content-Type", "application/x-www-form-urlencoded")
     local okay, oauth_res = util.func_call(ngx.location.capture, config.oauth_auth_endpoint, {
@@ -189,10 +191,14 @@ if nginx_narg_url == lsso_capture then
 
     if util.key_in_table(auth_response, "error") then
         -- Auth request failed, process the information and redirect.
-        -- XXX - process the auth response, check for invalid_scope, invalid_grant, unauthorized_client, etc
         util.auth_log("Received error from OAuth backend: " .. oauth_res.body)
-        local redir_uri = session.encode_return_message(lsso_login, "error", config.msg_bad_credentials)
-        ngx.redirect(redir_uri)
+        if auth_response["error"] == "invalid_scope" then
+            local redir_uri = session.encode_return_message(lsso_login, "error", config.msg_no_permission)
+            ngx.redirect(redir_uri)
+        else
+            local redir_uri = session.encode_return_message(lsso_login, "error", config.msg_bad_credentials)
+            ngx.redirect(redir_uri)
+        end
     else
         -- Success. Log it!
         util.auth_log("Auth success: " .. credentials["user"], lsso_logging_context)
@@ -210,6 +216,7 @@ if nginx_narg_url == lsso_capture then
     rdc:pipeline(function(p)
         p:hset(rd_sess_key, "username", credentials["user"])
         p:hset(rd_sess_key, "token", auth_response.access_token)
+        p:hset(rd_sess_key, "scope", auth_response.scope)
         p:hset(rd_sess_key, "created", current_time)
         p:hset(rd_sess_key, "remote_addr", nginx_client_address)
         p:hset(rd_sess_key, "salt", session_salt)
@@ -364,6 +371,19 @@ elseif nginx_narg_url ~= lsso_capture then
             util.session_log("Sending user to verify for checkin: " .. user_session, lsso_logging_context)
             to_verify = true
         else
+            local okay, session = util.func_call(session.resolve_session, user_session)
+            if okay and session then
+                -- Verify that the user can access this location based on scope
+                local loc_scope = scopes[nginx_server_name]
+                if session.scope ~= loc_scope then
+                    -- Redirect to login for re-auth to see if perms for this scope.
+                    util.session_log("Attempting scope upgrade for session: " .. user_session, lsso_logging_context)
+                    local redir_uri = session.encode_return_message(lsso_login, "error", config.msg_scope_upgrade)
+                    ngx.redirect(redir_uri)
+                else
+                    return
+                end
+            end
             request_cookie:set({
                 key = util.cookie_key("Redirect"),
                 value = "nil",

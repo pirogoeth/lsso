@@ -65,6 +65,7 @@ config = {
     msg_no_pw_field = "Missing parameter: password",
     msg_no_access = "Please log in to access this resource.",
     msg_no_permission = "You do not have permission to access this resource.",
+    msg_scope_upgrade = "Please log in again to upgrade your access.",
     msg_error = "Something happened while processing request data. Clear your cookies and try again.",
 
     -- Debugging settings
