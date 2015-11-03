@@ -242,6 +242,12 @@ if nginx_narg_url == lsso_capture then
     -- Decode the OAuth response and make sure it did not return an error
     local auth_response = cjson.decode(oauth_res.body)
 
+    if oauth_res.status ~= ngx.HTTP_OK then
+        util.auth_log("Upstream communication error: " .. oauth_res.body)
+        local redir_uri = session.encode_return_message(lsso_login, "error", config.msg_upstream_error)
+        ngx.redirect(redir_uri)
+    end
+
     if util.key_in_table(auth_response, "error") then
         -- Auth request failed, process the information and redirect.
         util.auth_log("Received error from OAuth backend: " .. oauth_res.body)

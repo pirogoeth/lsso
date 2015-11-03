@@ -68,6 +68,7 @@ config = {
     msg_no_permission = "You do not have permission to access this resource.",
     msg_scope_upgrade = "Please log in again to upgrade your access.",
     msg_error = "Something happened while processing request data. Clear your cookies and try again.",
+    msg_upstream_error = "Could not communicate with upstream...Try again later.",
 
     -- Debugging settings
     -- Debugging wraps calls and sends any exceptions to Sentry through Raven.
