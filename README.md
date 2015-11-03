@@ -55,7 +55,7 @@ Roadmap
   - [ ] /log/auth - view prettified auth event log
   - [ ] /log/session - view prettified session event log
 - [ ] Implement SAML 2.0 authentication
-- [ ] Use JWT cookie instead of set of unsigned cookies (? | [lua-resty-jet](https://github.com/SkyLothar/lua-resty-jwt))
+- [ ] Use JWT cookie instead of set of unsigned cookies (? | [lua-resty-jwt](https://github.com/SkyLothar/lua-resty-jwt))
 
 Contributing
 ============
