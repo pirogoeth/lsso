@@ -85,7 +85,7 @@ function check_session(user_session, do_validate)
         return false
     end
 
-    if session.remote_addr ~= nginx_client_address then
+    if config.session_address_validation and session.remote_addr ~= nginx_client_address then
         -- We need to invalidate this session, it may have been compromised.
         local okay = util.func_call(invalidate_session, user_session)
         if not okay then

@@ -564,7 +564,14 @@ end
 
 -- ngx_wrap_tls: Enables TLS for ngx.socket
 function _M.ngx_wrap_tls(self, sock)
-   local session, err = sock:sslhandshake(false, self.host, true)
+   local peer_verify = true
+   if self._luasec_params then
+      if self._luasec_params.verify == "none" then
+         peer_verify = false
+      end
+   end
+
+   local session, err = sock:sslhandshake(false, self.host, peer_verify)
    if not session then
       return nil, err
    end

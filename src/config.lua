@@ -27,6 +27,7 @@ config = {
     -- Recommended: at least half your cookie lifetime, or half your key lifetime
     session_checkin = 10800, -- Time before validate_token is called to ensure the OAuth token is still active.
     session_logging = true, -- Log session messages to Redis (lsso:log:session)
+    session_address_validation = true, -- Ensure a session hasn't switched IPs since last checkin.
 
     -- Auth settings
     auth_logging = true, -- Log auth messages to Redis (lsso:log:auth)

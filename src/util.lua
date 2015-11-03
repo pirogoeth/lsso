@@ -208,3 +208,26 @@ function get_cookie(cookie_name)
     local cookie = "cookie_" .. cookie_name
     return ngx.var[cookie]
 end
+
+-- Functions for getting values from tables in a protected manner.
+function prot_table_get(tbl, val, default)
+    if not tbl then
+        return nil
+    end
+
+    if not val then
+        return nil
+    end
+
+    local okay, val = pcall(unprot_table_get, tbl, val)
+    if not okay then
+        -- More than likely could not access this key, ret default
+        return default
+    else
+        return val
+    end
+end
+
+function unprot_table_get(tbl, val)
+    return tbl[val]
+end
