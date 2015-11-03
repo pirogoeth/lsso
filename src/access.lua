@@ -23,9 +23,9 @@ nginx_furl = ngx.var.scheme .. "://" .. nginx_server_name .. ngx.var.request_uri
 nginx_narg_url = ngx.var.scheme .. "://" .. nginx_server_name .. ngx.var.uri
 nginx_client_address = ngx.var.remote_addr
 nginx_client_useragent = ngx.req.get_headers()["User-Agent"]
-nginx_location_scope = util.prot_table_get(ngx.var, "lsso_location_scope")
+nginx_location_scope = ngx.var.lsso_location_scope
 
--- The ngx.var API returns "" if the variable doesn't exist...
+-- The ngx.var API returns "" if the variable doesn't exist but is used elsewhere..
 if nginx_location_scope == "" then
     nginx_location_scope = nil
 end
@@ -36,7 +36,7 @@ lsso_logging_context = {
     remote_ua = nginx_client_useragent,
     request_url = nginx_furl,
     request_scope = nginx_location_scope,
-    req_id = util.generate_random_string(16)
+    req_id = util.generate_random_string(16),
 }
 
 request_cookie = cookie:new()
@@ -83,7 +83,7 @@ if nginx_narg_url == lsso_capture then
                     value = "nil",
                     path = "/",
                     domain = "." .. config.cookie_domain,
-                    expires = util.COOKIE_EXPIRED
+                    expires = util.COOKIE_EXPIRED,
                 })
 
                 -- Generate a CDK and append to next_url
@@ -146,14 +146,14 @@ if nginx_narg_url == lsso_capture then
                 value = "nil",
                 path = "/",
                 domain = "." .. config.cookie_domain,
-                expires = util.COOKIE_EXPIRED
+                expires = util.COOKIE_EXPIRED,
             })
             request_cookie:set({
                 key = util.cookie_key("Redirect"),
                 value = "nil",
                 path = "/",
                 domain = "." .. config.cookie_domain,
-                expires = util.COOKIE_EXPIRED
+                expires = util.COOKIE_EXPIRED,
             })
             if user_redirect then
                 -- Session was invalidated and a redirect was attempted.
@@ -172,7 +172,7 @@ if nginx_narg_url == lsso_capture then
         if util.key_in_table(uri_args, "next") then
             local next_uri = uri_args["next"]
             ngx.req.set_uri_args({
-                ["next"] = next_uri
+                ["next"] = next_uri,
             })
             local redirect_arg = "?" .. ngx.var.args
             login_uri = lsso_login .. redirect_arg
@@ -284,7 +284,7 @@ if nginx_narg_url == lsso_capture then
             value = session_key,
             path = "/",
             domain = "." .. config.cookie_domain,
-            expires = ngx.cookie_time(expire_at)
+            expires = ngx.cookie_time(expire_at),
         })
 
         -- Set the session checkin time.
@@ -298,7 +298,7 @@ if nginx_narg_url == lsso_capture then
                 value = "nil",
                 path = "/",
                 domain = "." .. config.cookie_domain,
-                expires = util.COOKIE_EXPIRED
+                expires = util.COOKIE_EXPIRED,
             })
             ngx.redirect(user_redirect)
         else
@@ -312,7 +312,7 @@ if nginx_narg_url == lsso_capture then
             value = "nil",
             path = "/",
             domain = "." .. config.cookie_domain,
-            expires = util.COOKIE_EXPIRED
+            expires = util.COOKIE_EXPIRED,
         })
 
         -- Process the ?next= qs
@@ -337,7 +337,7 @@ if nginx_narg_url == lsso_capture then
             value = session_key,
             path = "/",
             domain = "." .. config.cookie_domain,
-            expires = ngx.cookie_time(expire_at)
+            expires = ngx.cookie_time(expire_at),
         })
 
         -- Get a CDK and set up the next_uri
@@ -363,11 +363,11 @@ elseif nginx_narg_url ~= lsso_capture then
     if not util.key_in_table(scopes, nginx_furl) then
         if nginx_location_scope then
             util.merge_tables({
-                [nginx_furl] = nginx_location_scope
+                [nginx_furl] = nginx_location_scope,
             }, scopes)
         else
             util.merge_tables({
-                [nginx_furl] = config.oauth_auth_scope
+                [nginx_furl] = config.oauth_auth_scope,
             }, scopes)
         end
     end
@@ -498,7 +498,7 @@ elseif nginx_narg_url ~= lsso_capture then
         -- This is NOT on the native domain. Have to start CDA.
         local uri_next = ngx.encode_base64(nginx_furl)
         ngx.req.set_uri_args({
-            ["next"] = uri_next
+            ["next"] = uri_next,
         })
         redirect_arg = "?" .. ngx.var.args
 
