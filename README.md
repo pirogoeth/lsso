@@ -26,7 +26,7 @@ Requirements
 - lua-cjson (https://github.com/efelix/lua-cjson)
 - redis-lua (https://github.com/nrk/redis-lua)
 - OAuth server (recommended: https://github.com/pirogoeth/osiris; has been tested)
-
+- xml (https://github.com/lubyk/xml; optional, only for SAML auth)
 
 Installation
 =============
