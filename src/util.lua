@@ -14,6 +14,13 @@ local socket = require "socket"
 -- Useful constants.
 COOKIE_EXPIRED = "Thu, 01 Jan 1970 00:00:00 UTC"
 
+HTTP_UNKNOWN       = -1
+HTTP_INFORMATIONAL = 100
+HTTP_SUCCESS       = 200
+HTTP_REDIRECTION   = 300
+HTTP_CLIENT_ERR    = 400
+HTTP_SERVER_ERR    = 500
+
 -- Returns if `haystack` starts with `needle`.
 function string.startswith(haystack, needle)
     return string.sub(haystack, 1, string.len(needle)) == needle
@@ -230,4 +237,30 @@ end
 
 function unprot_table_get(tbl, val)
     return tbl[val]
+end
+
+-- Determines the class of a given HTTP status
+-- Returns the status class of the error:
+--  HTTP_INFORMATIONAL => 1xx
+--  HTTP_SUCCESS => 2xx
+--  HTTP_REDIRECTION => 3xx
+--  HTTP_CLIENT_ERR => 4xx
+--  HTTP_SERVER_ERR => 5xx
+--  HTTP_UNKNOWN => -1
+function http_status_class(status)
+    if not status then
+        return HTTP_UNKNOWN
+    end
+
+    if status >= HTTP_INFORMATIONAL and status < HTTP_SUCCESS then
+        return HTTP_INFORMATIONAL
+    elseif status >= HTTP_SUCCESS and status < HTTP_REDIRECTION then
+        return HTTP_SUCCESS
+    elseif status >= HTTP_REDIRECTION and status < HTTP_CLIENT_ERR then
+        return HTTP_REDIRECTION
+    elseif status >= HTTP_SERVER_ERR and status < (HTTP_SERVER_ERR + 100) then
+        return HTTP_SERVER_ERR
+    else
+        return HTTP_UNKNOWN
+    end
 end
