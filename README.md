@@ -12,7 +12,8 @@ Features:
  - Cross-domain-authentication
  - Backend session store in Redis
  - Auth and session event logging to Redis
-
+ - CLI management tool, [lssoctl](https://github.com/maiome-development/lssoctl) (*In Progress!*)
+ - Management API (*In Progress!*)
 
 Requirements
 ============
@@ -32,7 +33,9 @@ Installation
 - Clone this repo..
 - Copy external/\* to your lua5.1 package dir (/usr/local/share/lua/5.1/ or similar)
 - Use the file from `nginx/sso-init.conf` to set up the main nginx conf.
+  - Make sure to adjust the request rate limit to your desire.
 - Use the template from `nginx/sso-site.conf` to set up your SSO endpoint.
+  - Adjust any endpoints as you wish, but make sure to update `config.lua` as well.
 - Grab the src/config.lua, configure it, and stick it where you want
 - Change `config_path` in src/init.lua to point to your newly configured config.lua.
 - Insert `access_by_lua_file /path/to/lsso/src/access.lua;` in any location, server block, etc, that you want to protect.
@@ -48,14 +51,16 @@ Roadmap
 - [X] Per-location auth scoping (customizable scopes for each protected location: `set $lsso_location_scope 'admin';` before `access_by_lua_file`)
 - [ ] Status portal (with *content_by_lua_file* and [lustache](https://github.com/Olivine-Labs/lustache))
 - [ ] Some user-facing endpoints for managing sessions:
-  - [ ] /auth/logout - a more graceful way of doing the above..?
+  - [ ] /auth/logout - kill the active user session, if any.
 - [ ] Stats collection for info about user sessions, login attempts, page accesses (?)
   - [ ] Stats export via statsd for aggregation (?)
 - [ ] Log viewer endpoints (?)
   - [ ] /log/auth - view prettified auth event log
   - [ ] /log/session - view prettified session event log
+- [ ] API for token requests, management, health, etc.
 - [ ] Implement SAML 2.0 authentication
 - [ ] Use JWT cookie instead of set of unsigned cookies (? | [lua-resty-jwt](https://github.com/SkyLothar/lua-resty-jwt))
+
 
 Contributing
 ============

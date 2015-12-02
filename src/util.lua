@@ -31,6 +31,14 @@ function string.endswith(haystack, needle)
     return needle == "" or string.sub(haystack, -(string.len(needle))) == needle
 end
 
+function string.chopstart(haystack, needle)
+    if haystack:startswith(needle) then
+        return string.sub(haystack, string.len(needle) + 1, string.len(haystack))
+    end
+
+    return haystack
+end
+
 -- Packs a table.
 function table.pack(...)
     return { n = select("#", ...), ... }
@@ -200,6 +208,15 @@ function session_log(...)
     end
 
     return log_redis("session", ...)
+end
+
+-- Wrapper function for log_redis("api", ...)
+function api_log(...)
+    if not config.api_logging then
+        return nil
+    end
+
+    return log_redis("api", ...)
 end
 
 -- Convenience functions for Redis keys and cookies

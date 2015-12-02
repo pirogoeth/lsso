@@ -29,6 +29,11 @@ config = {
     session_logging = true, -- Log session messages to Redis (lsso:log:session)
     session_address_validation = true, -- Ensure a session hasn't switched IPs since last checkin.
 
+    -- API settings
+    api_logging = true, -- Log API messages to Redis (lsso:log:api)
+    -- API will be exposed on lsso_scheme://lsso_domain .. api_endpoint
+    api_endpoint = "/api", -- API endpoint...NO TRAILING SLASH!
+
     -- Auth settings
     auth_logging = true, -- Log auth messages to Redis (lsso:log:auth)
 
@@ -38,20 +43,20 @@ config = {
     -- Adjust as needed. Need to be on lsso_domain.
     oauth_auth_endpoint = "/token", -- Endpoint used for retrieving tokens
     oauth_token_endpoint = "/checktoken", -- Endpoint used for checking tokens
-    oauth_auth_scope = "sso",
-    oauth_auth_context = {
-        grant_type = "password"
+    oauth_auth_scope = "sso", -- Default scope to request for SSO access
+    oauth_auth_context = { -- Additional context to send in the request to OAuth
+        grant_type = "password", 
     }, -- Additional static parameters that will be passed to the auth endpoint
 
     -- Location settings
-    lsso_domain = "sso.example.org", -- No trailing slash!
+    lsso_domain = "sso.example.org", -- Auth domain; No trailing slash!
     lsso_scheme = "https",
     lsso_login_redirect = "/auth", -- Endpoint to redirect to for auth.
     lsso_capture_location = "/auth/verify", -- Endpoint to capture for auth
-    lsso_default_redirect = "https://maio.me", -- Endpoint to redirect to when no ?next
+    lsso_default_redirect = "https://example.org", -- Endpoint to redirect to when no ?next
     lsso_cross_domain_qs = "lsso_session",
 
-    -- LuaSec SSL Settings
+    -- LuaSec SSL Settings; Used for raven
     luasec_params = {
         mode = "client",
         protocol = "tlsv1",
