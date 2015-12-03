@@ -30,7 +30,7 @@ if nginx_location_scope == "" then
     nginx_location_scope = nil
 end
 
-lsso_logging_context = {
+local lsso_logging_context = {
     context = "logging",
     remote_addr = nginx_client_address,
     remote_ua = nginx_client_useragent,
@@ -281,6 +281,7 @@ if nginx_narg_url == lsso_capture then
         p:hset(rd_sess_key, "created", current_time)
         p:hset(rd_sess_key, "remote_addr", nginx_client_address)
         p:hset(rd_sess_key, "salt", session_salt)
+        p:hset(rd_sess_key, "origin", "active login")
         p:expire(rd_sess_key, config.cookie_lifetime)
     end)
 
