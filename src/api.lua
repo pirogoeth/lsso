@@ -199,6 +199,7 @@ elseif lsso_api_request == "/token/request" then
     rdc:pipeline(function(p)
         p:hset(rd_acc_key, "created", current_time)
         p:hset(rd_acc_key, "session", session_key)
+        p:hset(rd_acc_key, "ttl", args["expire"])
         p:expire(rd_acc_key, args["expire"])
     end)
 

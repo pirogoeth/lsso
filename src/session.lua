@@ -28,6 +28,27 @@ function resolve_session(session_token)
     return redis_response
 end
 
+function resolve_access_token(access_token, destroy)
+    -- Resolve an access token to a session token.
+    local rd_acc_key = util.redis_key("acctok:" .. access_token)
+
+    redis_response = rdc:exists(rd_acc_key)
+    if not redis_response then
+        return nil
+    end
+
+    redis_response = rdc:hgetall(rd_acc_key)
+    if not redis_response then
+        return nil
+    end
+
+    if destroy then
+        rdc:del(rd_acc_key)
+    end
+
+    return redis_response
+end
+
 function validate_token(token_response)
     -- Take a response from resolve_session() and validate with oauth server.
     local token = token_response.token

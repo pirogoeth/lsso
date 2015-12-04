@@ -190,6 +190,50 @@ if nginx_narg_url == lsso_capture then
     ngx.req.read_body()
     local credentials = ngx.req.get_post_args()
 
+    if util.key_in_table(credentials, "access_token") then
+        util.auth_log("Attempting to open session from access_token!", lsso_logging_context)
+        local access_token = credentials["access_token"]
+
+        local okay, access_info = util.func_call(session.resolve_access_token, access_token, false)
+        if not access_info then
+            util.auth_log("Failed access token lookup: " .. access_token, lsso_logging_context)
+            local redir_uri = session.encode_return_message(lsso_login, "error", config.msg_no_permission)
+            ngx.redirect(redir_uri)
+        end
+
+        local okay, session_info = util.func_call(session.resolve_session, access_info.session)
+        if not session_info then
+            util.auth_log("Failed session lookup from access token: " .. access_token, lsso_logging_context)
+            local redir_uri = session.encode_return_message(lsso_login, "error", config.msg_no_permission)
+            ngx.redirect(redir_uri)
+        end
+
+        local expire_at = access_info.created + access_info.ttl
+        request_cookie:set({
+            key = util.cookie_key("Session"),
+            value = access_info.session,
+            path = "/",
+            domain = "." .. config.cookie_domain,
+            expires = ngx.cookie_time(expire_at),
+        })
+
+        util.auth_log("Opened session from access token: " .. access_token, lsso_logging_context)
+
+        local user_redirect = request_cookie:get(util.cookie_key("Redirect"))
+        if user_redirect then
+            request_cookie:set({
+                key = util.cookie_key("Redirect"),
+                value = "nil",
+                path = "/",
+                domain = "." .. config.cookie_domain,
+                expires = util.COOKIE_EXPIRED,
+            })
+            ngx.redirect(user_redirect)
+        else
+            ngx.redirect(config.lsso_default_redirect)
+        end
+    end
+
     -- Make sure we have been provided credentials for login.
     if not util.key_in_table(credentials, "user") then
         util.auth_log("Attempted login without `user` field.", lsso_logging_context)
