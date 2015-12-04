@@ -201,7 +201,7 @@ if nginx_narg_url == lsso_capture then
             ngx.redirect(redir_uri)
         end
 
-        local okay, session_info = util.func_call(session.resolve_session, access_info.session)
+        local okay, session_info = util.func_call(session.resolve_session, access_info.session, true)
         if not session_info then
             util.auth_log("Failed session lookup from access token: " .. access_token, lsso_logging_context)
             local redir_uri = session.encode_return_message(lsso_login, "error", config.msg_no_permission)

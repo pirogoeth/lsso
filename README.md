@@ -14,6 +14,7 @@ Features:
  - Auth and session event logging to Redis
  - CLI management tool, [lssoctl](https://github.com/maiome-development/lssoctl) (*In Progress!*)
  - Management API (*In Progress!*)
+ - Temporary access token generation
 
 Requirements
 ============
@@ -58,6 +59,8 @@ Roadmap
   - [ ] /log/auth - view prettified auth event log
   - [ ] /log/session - view prettified session event log
 - [ ] API for token requests, management, health, etc.
+  - [X] /api/\_health - simple status
+  - [X] /api/token/request - request access token
 - [ ] Implement SAML 2.0 authentication
 - [ ] Use JWT cookie instead of set of unsigned cookies (? | [lua-resty-jwt](https://github.com/SkyLothar/lua-resty-jwt))
 
