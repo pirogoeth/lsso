@@ -191,8 +191,12 @@ if nginx_narg_url == lsso_capture then
     local credentials = ngx.req.get_post_args()
 
     if util.key_in_table(credentials, "access_token") then
-        util.auth_log("Attempting to open session from access_token!", lsso_logging_context)
         local access_token = credentials["access_token"]
+        if access_token == "" or access_token == nil then
+            goto skip_access_token
+        end
+
+        util.auth_log("Attempting to open session from access_token!", lsso_logging_context)
 
         local okay, access_info = util.func_call(session.resolve_access_token, access_token, false)
         if not access_info then
@@ -232,6 +236,7 @@ if nginx_narg_url == lsso_capture then
         else
             ngx.redirect(config.lsso_default_redirect)
         end
+        ::skip_access_token::
     end
 
     -- Make sure we have been provided credentials for login.
