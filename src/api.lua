@@ -100,6 +100,15 @@ elseif lsso_api_request == "/token/request" then
         args["scope"] = config.oauth_auth_scope
     else
         -- XXX - add whitelisted/blacklisted scopes for token requests
+        local scopes_req = args["scope"]:split(" ")
+        local scopes = ""
+        for _, v in pairs(scopes_req) do
+            if not util.value_in_table(config.api_access_token_allowed_scopes, v) then
+                util.api_log("Requested unallowed scope " .. v, lsso_logging_context)
+                scopes = scopes .. " " .. v
+            end
+        end
+        args["scope"] = string.sub(scopes, 2)
     end
 
     -- Create auth args
