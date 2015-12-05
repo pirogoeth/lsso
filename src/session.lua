@@ -25,6 +25,11 @@ function resolve_session(session_token)
         return nil
     end
 
+    -- Split the scope value to get an actual list of scopes.
+    if redis_response.scope ~= nil then
+        redis_response.scope = redis_response.scope:split(" ")
+    end
+
     return redis_response
 end
 
@@ -53,11 +58,12 @@ function validate_token(token_response)
     -- Take a response from resolve_session() and validate with oauth server.
     local token = token_response.token
     local username = token_response.username
+    local scopes = table.concat(token_response.scope, " ")
 
     local token_table = {
         access_token = token,
         username = username,
-        scope = config.oauth_auth_scope,
+        scope = scopes,
     }
     token_table = ngx.encode_args(token_table)
 

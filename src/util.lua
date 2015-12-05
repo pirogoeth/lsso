@@ -118,7 +118,7 @@ end
 function value_in_table(tabsrc, val)
     for k, v in pairs(tabsrc) do
         if v == val then
-            return key
+            return k
         end
     end
 

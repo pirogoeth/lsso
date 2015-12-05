@@ -104,7 +104,8 @@ elseif lsso_api_request == "/token/request" then
         local scopes = ""
         for _, v in pairs(scopes_req) do
             if not util.value_in_table(config.api_access_token_allowed_scopes, v) then
-                util.api_log("Requested unallowed scope " .. v, lsso_logging_context)
+                util.api_log("Requested disallowed scope " .. v, lsso_logging_context)
+            else
                 scopes = scopes .. " " .. v
             end
         end

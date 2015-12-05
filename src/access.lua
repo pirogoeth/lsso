@@ -101,7 +101,7 @@ if nginx_narg_url == lsso_capture then
 
             -- Check for regular redirect and send the user.
             if user_redirect then
-                if not util.key_in_table(scopes, user_redirect) then
+                if not util.key_in_table(__scopes, user_redirect) then
                     request_cookie:set({
                         key = util.cookie_key("Redirect"),
                         value = "nil",
@@ -111,7 +111,7 @@ if nginx_narg_url == lsso_capture then
                     })
                     ngx.redirect(user_redirect)
                 else
-                    if session_data.scope ~= scopes[user_redirect] then
+                    if not util.value_in_table(session_data.scope, __scopes[user_redirect]) then
                         -- Have to invalidate the current session and create a new one.
                         session.invalidate_session(user_session)
                         -- Delete Session cookie.
@@ -271,7 +271,7 @@ if nginx_narg_url == lsso_capture then
         if not user_redirect and next_uri then
             user_redirect = next_uri
         end
-        local location_scope = scopes[user_redirect] or config.oauth_auth_scope
+        local location_scope = __scopes[user_redirect] or config.oauth_auth_scope
 
         util.merge_tables({
             scope = location_scope,
@@ -418,15 +418,15 @@ elseif nginx_narg_url ~= lsso_capture then
     end
 
     -- Check for a set location scope.
-    if not util.key_in_table(scopes, nginx_furl) then
+    if not util.key_in_table(__scopes, nginx_furl) then
         if nginx_location_scope then
             util.merge_tables({
                 [nginx_furl] = nginx_location_scope,
-            }, scopes)
+            }, __scopes)
         else
             util.merge_tables({
                 [nginx_furl] = config.oauth_auth_scope,
-            }, scopes)
+            }, __scopes)
         end
     end
 
@@ -490,11 +490,12 @@ elseif nginx_narg_url ~= lsso_capture then
             local okay, sess = util.func_call(session.resolve_session, user_session)
             if okay and sess then
                 -- Verify that the user can access this location based on scope
-                local loc_scope = scopes[nginx_furl] or config.oauth_auth_scope
-                if sess.scope ~= loc_scope then
+                local loc_scope = __scopes[nginx_furl] or config.oauth_auth_scope
+                if not util.value_in_table(sess.scope, loc_scope) then
                     -- Redirect to login for re-auth to see if perms for this scope.
-                    util.session_log("User has scope " .. sess.scope .. " needs " .. loc_scope, lsso_logging_context)
-                    util.session_log("Attempting scope upgrade for session: " .. user_session, lsso_logging_context)
+                    util.session_log("User needs scope " .. loc_scope .. " but has " ..
+                                     table.concat(sess.scope, " ") .. ", upgrading..",
+                                     lsso_logging_context)
 
                     local expire_at = ngx.time() + config.cookie_lifetime
                     request_cookie:set({
