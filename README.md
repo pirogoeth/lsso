@@ -47,22 +47,28 @@ Installation
 Roadmap
 =======
 
-- [ ] More documentation!
-- [ ] HTTP Basic authentication support for endpoints.
-- [X] Per-location auth scoping (customizable scopes for each protected location: `set $lsso_location_scope 'admin';` before `access_by_lua_file`)
-- [ ] Status portal (with *content_by_lua_file* and [lustache](https://github.com/Olivine-Labs/lustache))
-- [ ] Some user-facing endpoints for managing sessions:
-  - [ ] /auth/logout - kill the active user session, if any.
-- [ ] Stats collection for info about user sessions, login attempts, page accesses (?)
-  - [ ] Stats export via statsd for aggregation (?)
-- [ ] Log viewer endpoints (?)
-  - [ ] /log/auth - view prettified auth event log
-  - [ ] /log/session - view prettified session event log
-- [ ] API for token requests, management, health, etc.
-  - [X] /api/\_health - simple status
-  - [X] /api/token/request - request access token
-- [ ] Implement SAML 2.0 authentication
-- [ ] Use JWT cookie instead of set of unsigned cookies (? | [lua-resty-jwt](https://github.com/SkyLothar/lua-resty-jwt))
+- Authentication:
+  - [ ] HTTP Basic authentication support for endpoints.
+  - [ ] Implement SAML 2.0 authentication
+  - [ ] Implement U2F Registration / Authentication process
+  - [ ] Use JWT cookie instead of set of unsigned cookies (? | [lua-resty-jwt](https://github.com/SkyLothar/lua-resty-jwt))
+  - [X] Per-location auth scoping (customizable scopes for each protected location: `set $lsso_location_scope 'admin';` before `access_by_lua_file`)
+- API:
+  - [ ] Some user-facing endpoints for managing sessions:
+    - [ ] /auth/logout - kill the active user session, if any.
+  - [ ] API for token requests, management, health, etc.
+    - [X] /api/\_health - simple status
+    - [X] /api/token/request - request access token
+    - [ ] Log access endpoints
+      - [ ] /log/auth - authentication event log
+      - [ ] /log/session - session event log
+      - ...
+    - ...
+- Miscellaneous:
+  - [ ] More documentation!
+  - [ ] Stats collection for info about user sessions, login attempts, page accesses (?)
+    - [ ] Stats export via statsd for aggregation (?)
+  - [ ] Status portal (with *content_by_lua_file* and [lustache](https://github.com/Olivine-Labs/lustache))
 
 
 Contributing
