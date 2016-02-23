@@ -58,6 +58,9 @@ Roadmap
     - _Stage_: Researching
   - [X] Per-location auth scoping (customizable scopes for each protected location: `set $lsso_location_scope 'admin';` before `access_by_lua_file`)
 - API:
+  - [ ] API access tokens
+    - Inherently different from regular access tokens, but possibly managed/requested through the same endpoint?
+    - If using a different endpoint, possibly `/api/auth` (?).
   - [ ] Some user-facing endpoints for managing sessions:
     - [ ] /auth/logout - kill the active user session, if any.
   - [ ] API for token requests, management, health, etc.

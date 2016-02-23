@@ -243,7 +243,7 @@ elseif lsso_api_request:startswith("/log/") then
         }
         response = cjson.encode(response)
         ngx.say(response)
-        ngx.exit(ngx.HTTP_OK)
+        return
     end
 
     local page = nil
