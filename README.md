@@ -49,9 +49,13 @@ Roadmap
 
 - Authentication:
   - [ ] HTTP Basic authentication support for endpoints.
+    - _Stage_: Researching
   - [ ] Implement SAML 2.0 authentication
+    - _Stage_: Researching & implementing
   - [ ] Implement U2F Registration / Authentication process
+    - _Stage_: Researching
   - [ ] Use JWT cookie instead of set of unsigned cookies (? | [lua-resty-jwt](https://github.com/SkyLothar/lua-resty-jwt))
+    - _Stage_: Researching
   - [X] Per-location auth scoping (customizable scopes for each protected location: `set $lsso_location_scope 'admin';` before `access_by_lua_file`)
 - API:
   - [ ] Some user-facing endpoints for managing sessions:
@@ -59,9 +63,10 @@ Roadmap
   - [ ] API for token requests, management, health, etc.
     - [X] /api/\_health - simple status
     - [X] /api/token/request - request access token
-    - [ ] Log access endpoints
-      - [ ] /log/auth - authentication event log
-      - [ ] /log/session - session event log
+    - [X] Log access endpoints
+      - [X] /log/api - api event log
+      - [X] /log/auth - authentication event log
+      - [X] /log/session - session event log
       - ...
     - ...
 - Miscellaneous:

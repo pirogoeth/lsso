@@ -21,6 +21,8 @@ HTTP_REDIRECTION   = 300
 HTTP_CLIENT_ERR    = 400
 HTTP_SERVER_ERR    = 500
 
+LOG_BUCKETS = {"auth", "api", "session"}
+
 -- Returns if `haystack` starts with `needle`.
 function string.startswith(haystack, needle)
     return string.sub(haystack, 1, string.len(needle)) == needle
@@ -305,5 +307,69 @@ function http_status_class(status)
         return HTTP_SERVER_ERR
     else
         return HTTP_UNKNOWN
+    end
+end
+
+function key_length(redis_key)
+    -- Pull the length of the list in Redis.
+    redis_response = rdc:exists(redis_key)
+    if not redis_response then
+        return 0
+    end
+
+    redis_response = rdc:llen(redis_key)
+    if not redis_response then
+        return 0
+    end
+
+    return redis_response
+end
+
+function log_fetch(bucket, page, limit)
+    if value_in_table(LOG_BUCKETS, bucket) == nil then
+        return nil
+    end
+
+    if page == nil then
+        page = 0
+    end
+
+    if limit == nil then
+        limit = tonumber(config.log_paginate_count or 20) or 20
+    end
+
+    local key = redis_key("log:" .. bucket)
+
+    -- Pull a "page" of logs
+    local length = key_length(key)
+    if length == 0 then
+        return {}
+    end
+
+    local page_start = page * limit
+    local page_end = page_start + limit - 1
+
+    redis_response = rdc:lrange(key, page_start, page_end)
+    if not redis_response then
+        return {}
+    else
+        resp = {}
+        for _, val in ipairs(redis_response) do
+            local real = unfurl_json(val)
+            real._raw = unfurl_json(val, true)
+            table.insert(resp, real)
+        end
+        return resp
+    end
+end
+
+-- JSON data that gets put in to Redis tends to come back out in a strange
+-- format. This function takes the JSON output and fixes it up for decoding.
+function unfurl_json(jsonstr, no_decode)
+    jsonstr = string.gsub(jsonstr, "\\/", "/")
+    if not no_decode then
+        return cjson.decode(jsonstr)
+    else
+        return jsonstr
     end
 end

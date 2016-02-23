@@ -6,6 +6,8 @@
 
 -- External library imports
 local cjson = require "cjson"
+local raven = require "raven"
+local redis = require "redis"
 
 -- Internal library imports
 local session = require "session"
@@ -13,6 +15,7 @@ local util = require "util"
 
 local lsso_api = config.lsso_scheme .. "://" .. config.lsso_domain .. config.api_endpoint
 
+-- Processed nginx variables
 nginx_uri = ngx.var.uri
 nginx_server_name = ngx.var.server_name
 nginx_furl = ngx.var.scheme .. "://" .. nginx_server_name .. ngx.var.request_uri
@@ -20,6 +23,7 @@ nginx_narg_url = ngx.var.scheme .. "://" .. nginx_server_name .. ngx.var.uri
 nginx_client_address = ngx.var.remote_addr
 nginx_client_useragent = ngx.req.get_headers()["User-Agent"]
 nginx_location_scope = ngx.var.lsso_location_scope
+nginx_uri_args = ngx.req.get_uri_args()
 
 -- The ngx.var API returns "" if the variable doesn't exist but is used elsewhere..
 if nginx_location_scope == "" then
@@ -38,6 +42,10 @@ local lsso_logging_context = {
     origin = "api",
 }
 
+-- Non-consistent variables
+local redis_response = nil
+
+-- Actual API routes
 if lsso_api_request == "/_health" then
     ngx.say("okay")
 elseif lsso_api_request == "/token/request" then
@@ -225,4 +233,48 @@ elseif lsso_api_request == "/token/request" then
     access_data = cjson.encode(access_data)
 
     ngx.say(access_data)
+elseif lsso_api_request:startswith("/log/") then
+    local bucket = lsso_api_request:chopstart("/log/")
+    if util.value_in_table(util.LOG_BUCKETS, bucket) == nil then
+        util.api_log("Requested bad bucket: " .. bucket, lsso_logging_context)
+        local response = {
+            code = 404,
+            message = "Requested log bucket does not exist.",
+        }
+        response = cjson.encode(response)
+        ngx.say(response)
+        ngx.exit(ngx.HTTP_OK)
+    end
+
+    local page = nil
+    local limit = nil
+
+    -- Try and find ?page in the qs
+    if util.key_in_table(nginx_uri_args, "page") then
+        page = tonumber(nginx_uri_args["page"]) or nil
+    end
+
+    -- Try and find ?limit in the qs
+    if util.key_in_table(nginx_uri_args, "limit") then
+        limit = tonumber(nginx_uri_args["limit"]) or nil
+    end
+
+    util.api_log(string.format(
+        "Requested bucket: %s [page=%d limit=%d]",
+        bucket,
+        page,
+        limit))
+
+    local log_data = util.log_fetch(bucket, page, limit)
+    local response = {
+        code = 200,
+        message = "okay",
+        pagination = {
+            ["page"] = page,
+            ["limit"] = limit,
+        },
+        ["response"] = log_data,
+    }
+    response = cjson.encode(response)
+    ngx.say(response)
 end
