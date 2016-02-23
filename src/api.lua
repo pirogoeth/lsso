@@ -58,7 +58,7 @@ elseif lsso_api_request == "/token/request" then
     --  - username: OAuth username [required]
     --  - password: OAuth password [required]
     --  - expire: number of seconds until token expiry [optional; defaults to cookie_lifetime]
-    --  - scope: scope to create the access token under [option; defaults to oauth_auth_scope]
+    --  - scope: scope to create the access token under [optional; defaults to oauth_auth_scope]
     --
     -- This API routine will essentially go through the entire session generation process, but
     -- it will just return an access token, which can be used to log in on the portal.
