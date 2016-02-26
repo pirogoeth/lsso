@@ -21,7 +21,7 @@ HTTP_REDIRECTION   = 300
 HTTP_CLIENT_ERR    = 400
 HTTP_SERVER_ERR    = 500
 
-LOG_BUCKETS = {"auth", "api", "session"}
+LOG_BUCKETS = {"auth", "api", "session", "saml"}
 
 -- Returns if `haystack` starts with `needle`.
 function string.startswith(haystack, needle)
@@ -245,6 +245,15 @@ function api_log(...)
     end
 
     return log_redis("api", ...)
+end
+
+-- Wrapper function for log_redis("saml", ...)
+function saml_log(...)
+    if not config.saml_logging then
+        return nil
+    end
+
+    return log_redis("saml", ...)
 end
 
 -- Convenience functions for Redis keys and cookies

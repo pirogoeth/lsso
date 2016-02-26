@@ -53,6 +53,14 @@ config = {
         grant_type = "password", 
     }, -- Additional static parameters that will be passed to the auth endpoint
 
+    -- SAML IdP settings
+    --
+    -- These settings control the SAML 2.0 IdP protocol that is provided by
+    -- LSSO.
+    saml_logging = true, -- Log SAML messages to Redis (lsso:log:saml)
+    saml_endpoint = "/idp", -- SAML endpoint...NO TRAILING SLASH!
+    saml_metadata_file = "/etc/lsso/metadata.xml", -- SAML Metadata file location
+
     -- Location settings
     lsso_domain = "sso.example.org", -- Auth domain; No trailing slash!
     lsso_scheme = "https",

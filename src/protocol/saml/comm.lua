@@ -1,8 +1,8 @@
 --
--- saml.lua -- module that handles SAML communication
+-- saml/comm.lua -- module that handles SAML communication
 --
 
-module('saml', package.seeall)
+module('protocol.saml.comm', package.seeall)
 
 -- Lua standard and external library imports
 local os = require "os"
@@ -38,7 +38,7 @@ local SAML_STATUS = {
     UNSUPPORTED_BINDING_URI      = "urn:oasis:names:tc:SAML:2.0:status:UnsupportedBinding",
 }
 
-local SAML_NAMEID = {
+SAML_NAMEID = {
     TRANSIENT                    = "urn:oasis:names:tc:SAML:2.0:nameid-format:transient",
     PERSISTENT                   = "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent",
     ENTITY                       = "urn:oasis:names:tc:SAML:2.0:nameid-format:entity",
@@ -47,17 +47,17 @@ local SAML_NAMEID = {
     UNSPECIFIED                  = "urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified",
 }
 
-local SAML_CM = {
+SAML_CM = {
     BEARER                       = "urn:oasis:names:tc:SAML:2.0:cm:bearer",
     H_O_K                        = "urn:oasis:names:tc:SAML:2.0:cm:holder-of-key",
     SENDER_VOUCHES               = "urn:oasis:names:tc:SAML:2.0:cm:sender-vouches",
 }
 
-local SAML_AUTHN_CTX_REF = {
+SAML_AUTHN_CTX_REF = {
     PASSWORD                     = "urn:oasis:names:tc:SAML:2.0:ac:classes:Password",
 }
 
-local SAML_ATTR_NAME_FMT = {
+SAML_ATTR_NAME_FMT = {
     BASIC                        = "urn:oasis:names:tc:SAML:2.0:attrname-format:basic",
 }
 

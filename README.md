@@ -27,6 +27,7 @@ Requirements
 - redis-lua (https://github.com/nrk/redis-lua)
 - OAuth server (recommended: https://github.com/pirogoeth/osiris; has been tested)
 - xml (https://github.com/lubyk/xml; optional, only for SAML auth)
+- lzlib (luarocks: lzlib -or- src: https://github.com/LuaDist/lzlib; currently only for SAML)
 
 Installation
 =============
