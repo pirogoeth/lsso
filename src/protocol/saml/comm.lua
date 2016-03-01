@@ -13,29 +13,35 @@ local session = require "session"
 local util = require "util"
 
 -- SAML protocol constants
-local SAML_STATUS = {
-    SUCCESS_URI                  = "urn:oasis:names:tc:SAML:2.0:status:Success",
-    REQUESTER_URI                = "urn:oasis:names:tc:SAML:2.0:status:Requester",
-    RESPONDER_URI                = "urn:oasis:names:tc:SAML:2.0:status:Responder",
-    VERSION_MISMATCH_URI         = "urn:oasis:names:tc:SAML:2.0:status:VersionMismatch",
-    AUTHN_FAILED_URI             = "urn:oasis:names:tc:SAML:2.0:status:AuthnFailed",
-    INVALID_ATTR_NAME_VALUE_URI  = "urn:oasis:names:tc:SAML:2.0:status:InvalidAttrNameOrValue",
-    INVALID_NAMEID_POLICY_URI    = "urn:oasis:names:tc:SAML:2.0:status:InvalidNameIDPolicy",
-    NO_AUTHN_CONTEXT_URI         = "urn:oasis:names:tc:SAML:2.0:status:NoAuthnContext",
-    NO_AVAIL_IDP_URI             = "urn:oasis:names:tc:SAML:2.0:status:NoAvailableIDP",
-    NO_SUPPORTED_IDP_URI         = "urn:oasis:names:tc:SAML:2.0:status:NoSupportedIDP",
-    PARTIAL_LOGOUT_URI           = "urn:oasis:names:tc:SAML:2.0:status:PartialLogout",
-    PROXY_COUNT_EXCESS_URI       = "urn:oasis:names:tc:SAML:2.0:status:ProxyCountExceeded",
-    REQ_DENIED_URI               = "urn:oasis:names:tc:SAML:2.0:status:RequestDenied",
-    REQ_UNSUPPORTED_URI          = "urn:oasis:names:tc:SAML:2.0:status:RequestUnsupported",
-    REQ_VERSION_DEPRECATED_URI   = "urn:oasis:names:tc:SAML:2.0:status:RequestVersionDeprecated",
-    REQ_VERSION_TOO_HIGH_URI     = "urn:oasis:names:tc:SAML:2.0:status:RequestVersionTooHigh",
-    REQ_VERSION_TOO_LOW_URI      = "urn:oasis:names:tc:SAML:2.0:status:RequestVersionTooLow",
-    RESOURCE_UNKNOWN_URI         = "urn:oasis:names:tc:SAML:2.0:status:ResourceNotRecognized",
-    TOO_MANY_RESPONSES_URI       = "urn:oasis:names:tc:SAML:2.0:status:TooManyResponses",
-    UNKNOWN_ATTR_PROFILE_URI     = "urn:oasis:names:tc:SAML:2.0:status:UnknownAttrProfile",
-    UNKNOWN_PRINCIPAL_URI        = "urn:oasis:names:tc:SAML:2.0:status:UnknownPrincipal",
-    UNSUPPORTED_BINDING_URI      = "urn:oasis:names:tc:SAML:2.0:status:UnsupportedBinding",
+SAML_PROTO = {
+    V2_0                         = "urn:oasis:names:tc:SAML:2.0:protocol",
+    V1_1                         = "urn:oasis:names:tc:SAML:1.1:protocol",
+    V1_0                         = "urn:oasis:names:tc:SAML:1.0:protocol",
+}
+
+SAML_STATUS = {
+    SUCCESS                      = "urn:oasis:names:tc:SAML:2.0:status:Success",
+    REQUESTER                    = "urn:oasis:names:tc:SAML:2.0:status:Requester",
+    RESPONDER                    = "urn:oasis:names:tc:SAML:2.0:status:Responder",
+    VERSION_MISMATCH             = "urn:oasis:names:tc:SAML:2.0:status:VersionMismatch",
+    AUTHN_FAILED                 = "urn:oasis:names:tc:SAML:2.0:status:AuthnFailed",
+    INVALID_ATTR_NAME_VALUE      = "urn:oasis:names:tc:SAML:2.0:status:InvalidAttrNameOrValue",
+    INVALID_NAMEID_POLICY        = "urn:oasis:names:tc:SAML:2.0:status:InvalidNameIDPolicy",
+    NO_AUTHN_CONTEXT             = "urn:oasis:names:tc:SAML:2.0:status:NoAuthnContext",
+    NO_AVAIL_IDP                 = "urn:oasis:names:tc:SAML:2.0:status:NoAvailableIDP",
+    NO_SUPPORTED_IDP             = "urn:oasis:names:tc:SAML:2.0:status:NoSupportedIDP",
+    PARTIAL_LOGOUT               = "urn:oasis:names:tc:SAML:2.0:status:PartialLogout",
+    PROXY_COUNT_EXCESS           = "urn:oasis:names:tc:SAML:2.0:status:ProxyCountExceeded",
+    REQ_DENIED                   = "urn:oasis:names:tc:SAML:2.0:status:RequestDenied",
+    REQ_UNSUPPORTED              = "urn:oasis:names:tc:SAML:2.0:status:RequestUnsupported",
+    REQ_VERSION_DEPRECATED       = "urn:oasis:names:tc:SAML:2.0:status:RequestVersionDeprecated",
+    REQ_VERSION_TOO_HIGH         = "urn:oasis:names:tc:SAML:2.0:status:RequestVersionTooHigh",
+    REQ_VERSION_TOO_LOW          = "urn:oasis:names:tc:SAML:2.0:status:RequestVersionTooLow",
+    RESOURCE_UNKNOWN             = "urn:oasis:names:tc:SAML:2.0:status:ResourceNotRecognized",
+    TOO_MANY_RESPONSES           = "urn:oasis:names:tc:SAML:2.0:status:TooManyResponses",
+    UNKNOWN_ATTR_PROFILE         = "urn:oasis:names:tc:SAML:2.0:status:UnknownAttrProfile",
+    UNKNOWN_PRINCIPAL            = "urn:oasis:names:tc:SAML:2.0:status:UnknownPrincipal",
+    UNSUPPORTED_BINDING          = "urn:oasis:names:tc:SAML:2.0:status:UnsupportedBinding",
 }
 
 SAML_NAMEID = {
@@ -62,24 +68,39 @@ SAML_ATTR_NAME_FMT = {
 }
 
 -- SAML protocol responses
-local saml_authn_response = {
-    xml = "samlp:Response",
-    ["xmlns:samlp"]  = "urn:oasis:names:tc:SAML:2.0:protocol",
-    ["xmlns:saml"]   = "urn:oasis:names:tc:SAML:2.0:assertion",
-    ["ID"]           = nil,
-    ["Version"]      = "2.0",
-    ["IssueInstant"] = nil,
-    ["Destination"]  = nil,
-    ["InResponseTo"] = nil,
-    {
-        xml = "saml:Issuer",
-        nil,
-    },
-    {
-        xml       = "samlp:Status",
-        ["Value"] = SAML_STATUS.SUCCESS_URI,
-    },
-    {
+function create_saml_response()
+    local res = {
+        xml = "samlp:Response",
+        ["xmlns:samlp"]  = SAML_PROTO.V2_0,
+        ["xmlns:saml"]   = "urn:oasis:names:tc:SAML:2.0:assertion",
+        ["ID"]           = nil,
+        ["Version"]      = "2.0",
+        ["IssueInstant"] = nil,
+        ["Destination"]  = nil,
+        ["InResponseTo"] = nil,
+        {
+            xml = "saml:Issuer",
+            nil,
+        },
+        {
+            xml          = "samlp:Status",
+            {
+                xml      = "samlp:StatusCode",
+                nil,
+            },
+        },
+    }
+
+    local res_id = "_" .. util.generate_random_string(32)
+
+    res.ID = res_id
+    res.IssueInstant = util.utc_time()
+
+    return res
+end
+
+function create_authn_response()
+    local ck = {
         xml              = "saml:Assertion",
         ["xmlns:xsi"]    = "http://www.w3.org/2001/XMLSchema-instance",
         ["xmlns:xs"]     = "http://www.w3.org/2001/XMLSchema",
@@ -146,27 +167,40 @@ local saml_authn_response = {
                 },
             },
         },
-    },
-}
+    }
 
-local saml_logout_response = {
-    xml              = "samlp:LogoutResponse",
-    ["xmlns:samlp"]  = "urn:oasis:names:tc:SAML:2.0:protocol",
-    ["xmlns:saml"]   = "urn:oasis:names:tc:SAML:2.0:assertion",
-    ["ID"]           = nil,
-    ["Version"]      = "2.0",
-    ["IssueInstant"] = nil,
-    ["Destination"]  = nil,
-    ["InResponseTo"] = nil,
-    {
-        xml = "saml:Issuer",
-        nil,
-    },
-    {
-        xml = "samlp:Status",
+    local resp = create_saml_response()
+
+    ck.IssueInstant = resp.IssueInstant
+    ck.ID = resp.ID
+
+    resp:insert(ck)
+
+    return resp
+end
+
+function create_saml_logout()
+    local saml_logout_response = {
+        xml              = "samlp:LogoutResponse",
+        ["xmlns:samlp"]  = SAML_PROTO.V2_0,
+        ["xmlns:saml"]   = "urn:oasis:names:tc:SAML:2.0:assertion",
+        ["ID"]           = nil,
+        ["Version"]      = "2.0",
+        ["IssueInstant"] = nil,
+        ["Destination"]  = nil,
+        ["InResponseTo"] = nil,
         {
-            xml       = "samlp:StatusCode",
-            ["Value"] = SAML_STATUS.SUCCESS,
-        }
-    },
-}
+            xml = "saml:Issuer",
+            nil,
+        },
+        {
+            xml = "samlp:Status",
+            {
+                xml       = "samlp:StatusCode",
+                ["Value"] = SAML_STATUS.SUCCESS,
+            }
+        },
+    }
+
+    return saml_logout_response
+end

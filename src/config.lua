@@ -60,6 +60,9 @@ config = {
     saml_logging = true, -- Log SAML messages to Redis (lsso:log:saml)
     saml_endpoint = "/idp", -- SAML endpoint...NO TRAILING SLASH!
     saml_metadata_file = "/etc/lsso/metadata.xml", -- SAML Metadata file location
+    saml_allowed_issuers = {
+    }, -- Allowed SAML request issuers.
+    saml_issuer_entity = "https://example.org/SAML2", -- SAML Issuer Entity
 
     -- Location settings
     lsso_domain = "sso.example.org", -- Auth domain; No trailing slash!

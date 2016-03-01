@@ -6,6 +6,7 @@
 local cjson = require "cjson"
 local raven = require "raven"
 local redis = require "redis"
+local xml = require "xml"
 local zlib = require "zlib"
 
 -- Internal library imports
@@ -62,7 +63,7 @@ if lsso_saml_request == "/SAML/Metadata" and nginx_req_method == "GET" then
     -- A metadata file can be generated through a service such as SAMLTool by OneLogin:
     --   https://www.samltool.com/idp_metadata.php
 
-    ngx.header.content_type = "text/xml"
+    util.http_rtype("text/xml")
 
     local metadata_file = io.open(config.saml_metadata_file, "r")
     local metadata = metadata_file:read("*a")
@@ -74,6 +75,8 @@ elseif lsso_saml_request == "/SAML/Redirect" and nginx_req_method == "GET" then
     --
     -- The HTTP-Redirect endpoint binding for SAML2.0 negotiation.
 
+    util.http_rtype("text/xml")
+
     local saml_request = nginx_uri_args.SAMLRequest
     if not saml_request then
         ngx.say("fail")
@@ -82,7 +85,98 @@ elseif lsso_saml_request == "/SAML/Redirect" and nginx_req_method == "GET" then
 
     saml_request = DEFLATE_HEADER .. ngx.decode_base64(saml_request)
     local inflated = zlib.inflate(saml_request)
-    ngx.say(inflated:read())
+    saml_request = inflated:read()
+    inflated:close()
+
+    -- Make sure this SAML request is valid.
+    --  Steps:
+    --   1) Ensure samlp:AuthnRequest/xmlns:samlp matches SAML 2.0 proto version
+    --   2) Ensure samlp:AuthnRequest/AssertionConsumerServiceURL is valid
+    --   3) Ensure samlp:AuthnRequest/Destination matches our URL
+    --   4) Ensure samlp:AuthnRequest/saml:Issuer is an allowed issuer
+    --   5) Check request signature, if necessary.
+    --
+
+    local req = xml.load(saml_request)
+    local resp = saml_comm.create_saml_response()
+
+    -- Set the SAML Response issuer
+    do
+        local issuer = xml.find(resp, "saml:Issuer")
+        table.insert(issuer, config.saml_issuer_entity)
+    end
+
+    -- Check for protocol version conflicts
+    if req["xmlns:samlp"] ~= saml_comm.SAML_PROTO.V2_0 then
+        local status = xml.find(resp, "samlp:StatusCode")
+        status.Value = saml_comm.SAML_STATUS.VERSION_MISMATCH
+        resp = xml.dump(resp)
+        ngx.say(resp)
+        return
+    end
+
+    -- Check the original ID
+    do
+        local id = req.ID
+        if #id ~= 33 or not id:startswith("_") then
+            local status = xml.find(resp, "samlp:StatusCode")
+            status.Value = saml_comm.SAML_STATUS.REQUESTER
+            resp = xml.dump(resp)
+            ngx.say(resp)
+            return
+        else
+            -- This ID is valid, include it in the response.
+            resp.InResponseTo = id
+        end
+    end
+
+    -- Check AssertionConsumerServiceURL
+    -- XXX: TODO
+
+    -- Check Destination
+    do
+        if req.Destination ~= nginx_narg_url then
+            local status = xml.find(resp, "samlp:StatusCode")
+            status.Value = saml_comm.SAML_STATUS.REQUESTER
+            resp = xml.dump(resp)
+            ngx.say(resp)
+            return
+        end
+    end
+
+    -- Check saml:Issuer
+    do
+        local issuer = xml.find(req, "saml:Issuer")
+        issuer = issuer[1]
+
+        if not util.value_in_table(config.saml_allowed_issuers, issuer) then
+            local status = xml.find(resp, "samlp:StatusCode")
+            status.Value = saml_comm.SAML_STATUS.REQ_DENIED
+            resp = xml.dump(resp)
+            ngx.say(resp)
+            return
+        end
+    end
+
+    -- Set the success status
+    do
+        local status = xml.find(resp, "samlp:StatusCode")
+        status.Value = saml_comm.SAML_STATUS.SUCCESS
+    end
+
+    -- At this point, check if the user has a session open on the SSO.
+    -- If they do, send the authorization to the SP. Otherwise, set the user's
+    -- redirect to this URL and try to get authorization. Once authorized, we
+    -- can redirect back here, collect the token, and set up the SAML session tokens
+    -- in the store. Then, we use ProtocolBinding to determine the session forwarding method
+    -- and then forward the proper session information to the SP.
+    --
+    -- TODO~!
+
+    -- XXX: Print the response. This is not the proper workflow, but we're figuring it out.
+    resp = xml.dump(resp)
+    ngx.say(resp)
+    return
 elseif lsso_saml_request == "/SAML/POST" and nginx_req_method == "POST" then
     -- POST /<config.saml_endpoint>/SAML/POST
     --
@@ -90,6 +184,8 @@ elseif lsso_saml_request == "/SAML/POST" and nginx_req_method == "POST" then
 
     -- We need to read the request body before trying to get the SAMLRequest and RelayState
     ngx.req.read_body()
+
+    util.http_rtype("text/xml")
 
     local saml_args = ngx.req.get_post_args()
     if not util.key_in_table(saml_args, "SAMLRequest") then

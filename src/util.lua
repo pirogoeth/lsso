@@ -21,6 +21,8 @@ HTTP_REDIRECTION   = 300
 HTTP_CLIENT_ERR    = 400
 HTTP_SERVER_ERR    = 500
 
+MIME_TYPE_REGEX    = "([%g]+)/([%g]+)"
+
 LOG_BUCKETS = {"auth", "api", "session", "saml"}
 
 -- Returns if `haystack` starts with `needle`.
@@ -41,30 +43,39 @@ function string.chopstart(haystack, needle)
     return haystack
 end
 
--- String split function from lua-users wiki
-function string:split(sSeparator, nMax, bRegexp)
-    assert(sSeparator ~= '')
-    assert(nMax == nil or nMax >= 1)
-
-    local aRecord = {}
-
-    if self:len() > 0 then
-        local bPlain = not bRegexp
-        nMax = nMax or -1
-
-        local nField, nStart = 1, 1
-        local nFirst,nLast = self:find(sSeparator, nStart, bPlain)
-        while nFirst and nMax ~= 0 do
-            aRecord[nField] = self:sub(nStart, nFirst - 1)
-            nField = nField + 1
-            nStart = nLast + 1
-            nFirst, nLast = self:find(sSeparator, nStart, bPlain)
-            nMax = nMax - 1
-        end
-        aRecord[nField] = self:sub(nStart)
+function string.split(haystack, delimiter, limit, use_regexp)
+    if delimiter == "" then
+        return haystack
     end
 
-    return aRecord
+    if limit ~= nil and limit < 1 then
+        return haystack
+    end
+
+    local chunks = {}
+
+    if haystack:len() > 0 then
+        local plain = not use_regexp
+        limit = limit or -1
+
+        local pos, start = 1, 1
+        local first, last = haystack:find(delimiter, start, plain)
+        while first and limit ~= 0 do
+            chunks[pos] = haystack:sub(start, first - 1)
+            pos = pos + 1
+            start = last + 1
+            first, last = haystack:find(delimiter, start, plain)
+            limit = limit - 1
+        end
+        chunks[pos] = haystack:sub(start)
+    end
+
+    return chunks
+end
+
+function string.trim(haystack)
+    local from = haystack:match("^%s*()")
+    return from > #haystack and "" or haystack:match(".*%S", from)
 end
 
 -- Packs a table.
@@ -103,6 +114,11 @@ function generate_random_string(length)
     end
 
     return s
+end
+
+-- Returns a SAML-specced UTC timestamp
+function utc_time()
+    return os.date("%Y-%m-%dT%X")
 end
 
 -- Checks if a table contains a key.
@@ -144,20 +160,56 @@ function merge_tables(from, onto)
     return onto
 end
 
-function table_tostring(tbl)
-    s = ""
-    for k, v in pairs(tbl) do
-        if type(k) ~= "string" then
-            k = tostring(k)
-        end
-        if type(v) == "table" then
-            s = s .. "; " .. k .. " -> " table_tostring(v)
-        else
-            s = s .. "; " .. k .. " -> " .. tostring(v)
-        end
+function table_tostring(tbl, pretty)
+    if not pretty then
+        pretty = false
     end
 
-    return s
+    if pretty then
+        s = ""
+        for k, v in pairs(tbl) do
+            if type(k) ~= "string" then
+                k = tostring(k)
+            end
+
+            if type(v) == "table" then
+                local child = table_tostring(v, true)
+                child = child:split("\n")
+                for _, frag in pairs(child) do
+                    if frag ~= nil and frag:trim() ~= "" then
+                        s = s .. "  " .. frag .. "\n"
+                    end
+                end
+            else
+                s = s .. k .. " -> " .. tostring(v) .. "\n"
+            end
+        end
+
+        return s
+    else
+        s = ""
+        for k, v in pairs(tbl) do
+            if type(k) ~= "string" then
+                k = tostring(k)
+            end
+
+            if s == "" then
+                if type(v) == "table" then
+                    s = s .. k .. " -> " .. table_tostring(v)
+                else
+                    s = s .. k .. " -> " .. tostring(v)
+                end
+            else
+                if type(v) == "table" then
+                    s = s .. "; " .. k .. " -> " .. table_tostring(v)
+                else
+                    s = s .. "; " .. k .. " -> " .. tostring(v)
+                end
+            end
+        end
+
+        return s
+    end
 end
 
 -- Function wrapper for Raven.
@@ -319,6 +371,30 @@ function http_status_class(status)
     end
 end
 
+-- Simple function to validate and set an HTTP Content-Type header
+-- with a corresponding charset string.
+function http_rtype(htyp, charset)
+    if not htyp then
+        return false
+    end
+
+    if not charset then
+        charset = "UTF-8"
+    end
+
+    if not string.match(htyp, MIME_TYPE_REGEX) then
+        return false
+    end
+
+    hdr = string.format("%s;charset=%s", htyp, charset)
+    ngx.header["Content-Type"] = hdr
+
+    return true
+end
+
+-- Uses Redis' exists() to ensure key existence and type() to get
+-- key data type, and then the appropriate len() function to determine
+-- the length of a Redis key.
 function key_length(redis_key)
     -- Pull the length of the list in Redis.
     redis_response = rdc:exists(redis_key)
@@ -326,7 +402,17 @@ function key_length(redis_key)
         return 0
     end
 
-    redis_response = rdc:llen(redis_key)
+    REDIS_SETS = {"list", "set", "zset"}
+
+    redis_response = rdc:type(redis_key)
+    if redis_response == "string" then
+        redis_response = rdc:strlen(redis_key)
+    elseif value_in_table(REDIS_SETS, redis_response) then
+        redis_response = rdc:llen(redis_key)
+    elseif redis_response == "hash" then
+        redis_response = rdc:hlen(redis_key)
+    end
+
     if not redis_response then
         return 0
     end

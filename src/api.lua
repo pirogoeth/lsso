@@ -62,6 +62,9 @@ elseif lsso_api_request == "/token/request" then
     --
     -- This API routine will essentially go through the entire session generation process, but
     -- it will just return an access token, which can be used to log in on the portal.
+
+    util.http_rtype("application/json")
+
     ngx.req.read_body()
     local args = ngx.req.get_post_args()
 
@@ -234,6 +237,20 @@ elseif lsso_api_request == "/token/request" then
 
     ngx.say(access_data)
 elseif lsso_api_request:startswith("/log/") then
+    -- GET /log/:bucket[?page=...&limit=...]
+    --
+    -- Returns the logs for the specified bucket.
+    -- Valid buckets are "api", "session", "saml", and
+    -- "auth".
+    --
+    -- Can take two query parameters, page and limit.
+    -- Page is used directly for pagination -- it chooses
+    -- which page to display.
+    -- Limit indirectly affects pagination -- if limit is changed
+    -- when switching pages, output may be missed.
+
+    util.http_rtype("application/json")
+
     local bucket = lsso_api_request:chopstart("/log/")
     if util.value_in_table(util.LOG_BUCKETS, bucket) == nil then
         util.api_log("Requested bad bucket: " .. bucket, lsso_logging_context)
