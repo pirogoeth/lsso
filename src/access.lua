@@ -78,13 +78,7 @@ if nginx_narg_url == lsso_capture then
 
                 -- Decode the URL and clear the redirect cookie
                 next_url = ngx.decode_base64(next_url)
-                request_cookie:set({
-                    key = util.cookie_key("Redirect"),
-                    value = "nil",
-                    path = "/",
-                    domain = "." .. config.cookie_domain,
-                    expires = util.COOKIE_EXPIRED,
-                })
+                util.set_cookie("Redirect")
 
                 -- Generate a CDK and append to next_url
                 local cross_domain_key = session.create_cdk_session(user_session)
@@ -102,38 +96,20 @@ if nginx_narg_url == lsso_capture then
             -- Check for regular redirect and send the user.
             if user_redirect then
                 if not util.key_in_table(__scopes, user_redirect) then
-                    request_cookie:set({
-                        key = util.cookie_key("Redirect"),
-                        value = "nil",
-                        path = "/",
-                        domain = "." .. config.cookie_domain,
-                        expires = util.COOKIE_EXPIRED,
-                    })
+                    util.set_cookie("Redirect")
                     ngx.redirect(user_redirect)
                 else
                     if not util.value_in_table(session_data.scope, __scopes[user_redirect]) then
                         -- Have to invalidate the current session and create a new one.
                         session.invalidate_session(user_session)
                         -- Delete Session cookie.
-                        request_cookie:set({
-                            key = util.cookie_key("Session"),
-                            value = "nil",
-                            path = "/",
-                            domain = "." .. config.cookie_domain,
-                            expires = util.COOKIE_EXPIRED,
-                        })
+                        util.set_cookie("Session")
                         -- Log and redirect to login page with error message.
                         util.session_log("Attempting scope upgrade for session: " .. user_session, lsso_logging_context)
                         local redir_uri = session.encode_return_message(lsso_login, "error", config.msg_scope_upgrade)
                         ngx.redirect(redir_uri)
                     else
-                        request_cookie:set({
-                            key = util.cookie_key("Redirect"),
-                            value = "nil",
-                            path = "/",
-                            domain = "." .. config.cookie_domain,
-                            expires = util.COOKIE_EXPIRED,
-                        })
+                        util.set_cookie("Redirect")
                         ngx.redirect(user_redirect)
                     end
                 end
@@ -141,20 +117,8 @@ if nginx_narg_url == lsso_capture then
                 ngx.redirect(config.lsso_default_redirect)
             end
         elseif not session_valid then
-            request_cookie:set({
-                key = util.cookie_key("Session"),
-                value = "nil",
-                path = "/",
-                domain = "." .. config.cookie_domain,
-                expires = util.COOKIE_EXPIRED,
-            })
-            request_cookie:set({
-                key = util.cookie_key("Redirect"),
-                value = "nil",
-                path = "/",
-                domain = "." .. config.cookie_domain,
-                expires = util.COOKIE_EXPIRED,
-            })
+            util.set_cookie("Session")
+            util.set_cookie("Redirect")
             if user_redirect then
                 -- Session was invalidated and a redirect was attempted.
                 -- Reset the cookies and redirect to login.
@@ -212,26 +176,14 @@ if nginx_narg_url == lsso_capture then
             ngx.redirect(redir_uri)
         end
 
-        local expire_at = access_info.created + access_info.ttl
-        request_cookie:set({
-            key = util.cookie_key("Session"),
-            value = access_info.session,
-            path = "/",
-            domain = "." .. config.cookie_domain,
-            expires = ngx.cookie_time(expire_at),
-        })
+        local expire_at = ngx.cookie_time(access_info.created + access_info.ttl)
+        util.set_cookie("Session", access_info.session, expire_at)
 
         util.auth_log("Opened session from access token: " .. access_token, lsso_logging_context)
 
         local user_redirect = request_cookie:get(util.cookie_key("Redirect"))
         if user_redirect then
-            request_cookie:set({
-                key = util.cookie_key("Redirect"),
-                value = "nil",
-                path = "/",
-                domain = "." .. config.cookie_domain,
-                expires = util.COOKIE_EXPIRED,
-            })
+            util.set_cookie("Redirect")
             ngx.redirect(user_redirect)
         else
             ngx.redirect(config.lsso_default_redirect)
@@ -336,14 +288,8 @@ if nginx_narg_url == lsso_capture then
 
     -- Check that the request host is a part of the cookie domain
     if not next_uri then
-        local expire_at = ngx.time() + config.cookie_lifetime
-        request_cookie:set({
-            key = util.cookie_key("Session"),
-            value = session_key,
-            path = "/",
-            domain = "." .. config.cookie_domain,
-            expires = ngx.cookie_time(expire_at),
-        })
+        local expire_at = ngx.cookie_time(ngx.time() + config.cookie_lifetime)
+        util.set_cookie("Session", session_key, expire_at)
 
         -- Set the session checkin time.
         session.set_checkin_time(session_key, current_time)
@@ -351,13 +297,7 @@ if nginx_narg_url == lsso_capture then
         -- XXX - need to do processing here!
         local user_redirect = request_cookie:get(util.cookie_key("Redirect"))
         if user_redirect then
-            request_cookie:set({
-                key = util.cookie_key("Redirect"),
-                value = "nil",
-                path = "/",
-                domain = "." .. config.cookie_domain,
-                expires = util.COOKIE_EXPIRED,
-            })
+            util.set_cookie("Redirect")
             ngx.redirect(user_redirect)
         else
             ngx.redirect(config.lsso_default_redirect)
@@ -365,13 +305,7 @@ if nginx_narg_url == lsso_capture then
     -- Otherwise, prepare for cross-domain authentication.
     else
         -- Make sure there is no redirect cookie...
-        request_cookie:set({
-            key = util.cookie_key("Redirect"),
-            value = "nil",
-            path = "/",
-            domain = "." .. config.cookie_domain,
-            expires = util.COOKIE_EXPIRED,
-        })
+        util.set_cookie("Redirect")
 
         -- Process the ?next= qs
         local base_scheme = nil
@@ -389,14 +323,8 @@ if nginx_narg_url == lsso_capture then
         end
 
         -- Send the session key to the client
-        local expire_at = ngx.time() + config.cookie_lifetime
-        request_cookie:set({
-            key = util.cookie_key("Session"),
-            value = session_key,
-            path = "/",
-            domain = "." .. config.cookie_domain,
-            expires = ngx.cookie_time(expire_at),
-        })
+        local expire_at = ngx.cookie_time(ngx.time() + config.cookie_lifetime)
+        util.set_cookie("Session", session_key, expire_at)
 
         -- Get a CDK and set up the next_uri
         local cross_domain_key = session.create_cdk_session(session_key)
@@ -445,23 +373,13 @@ elseif nginx_narg_url ~= lsso_capture then
 
         -- Need to do the cross domain redirection and session setting!
         -- Again, ensure there is no redirection cookie.
-        request_cookie:set({
-            key = util.cookie_key("Redirect"),
-            value = "nil",
-            path = "/",
-            domain = "." .. session.get_cross_domain_base(nginx_server_name),
-            expires = util.COOKIE_EXPIRED,
-        })
-
-        -- Set the session in the client.
-        local expire_at = ngx.time() + config.cookie_lifetime
-        request_cookie:set({
-            key = util.cookie_key("Session"),
-            value = user_session,
-            path = "/",
-            domain = "." .. session.get_cross_domain_base(nginx_server_name),
-            expires = ngx.cookie_time(expire_at),
-        })
+        do
+            local expire_at = ngx.time() + config.cookie_lifetime
+            local cdb = "." .. session.get_cross_domain_base(nginx_server_name)
+            -- Set session in the client
+            util.set_cookie("Redirect", nil, nil, cdb)
+            util.set_cookie("Session", user_session, nil, cdb)
+        end
 
         local current_time = ngx.now()
 
@@ -497,33 +415,15 @@ elseif nginx_narg_url ~= lsso_capture then
                                      table.concat(sess.scope, " ") .. ", upgrading..",
                                      lsso_logging_context)
 
-                    local expire_at = ngx.time() + config.cookie_lifetime
-                    request_cookie:set({
-                        key = util.cookie_key("Redirect"),
-                        value = nginx_furl,
-                        domain = "." .. config.cookie_domain,
-                        path = "/",
-                        expires = ngx.cookie_time(expire_at),
-                    })
+                    local expire_at = ngx.cookie_time(ngx.time() + config.cookie_lifetime)
+                    util.set_cookie("Redirect", nginx_furl, expire_at)
 
                     -- Invalidate the user session before redirect.
                     session.invalidate_session(user_session)
                     -- Delete session cookie.
-                    request_cookie:set({
-                        key = util.cookie_key("Session"),
-                        value = "nil",
-                        path = "/",
-                        domain = "." .. config.cookie_domain,
-                        expires = util.COOKIE_EXPIRED,
-                    })
+                    util.set_cookie("Session")
                     -- Reset the redirect cookie so scopes are referenced correctly.
-                    request_cookie:set({
-                        key = util.cookie_key("Redirect"),
-                        value = nginx_furl,
-                        domain = "." .. config.cookie_domain,
-                        path = "/",
-                        expires = ngx.cookie_time(expire_at),
-                    })
+                    util.set_cookie("Redirect", nginx_furl, expire_at)
                     -- Redirect to login page.
                     local redir_uri = session.encode_return_message(lsso_login, "error", config.msg_scope_upgrade)
                     ngx.redirect(redir_uri)
@@ -531,13 +431,7 @@ elseif nginx_narg_url ~= lsso_capture then
                     return
                 end
             end
-            request_cookie:set({
-                key = util.cookie_key("Redirect"),
-                value = "nil",
-                path = "/",
-                domain = "." .. config.cookie_domain,
-                expires = util.COOKIE_EXPIRED,
-            })
+            util.set_cookie("Redirect")
             return -- Allow access phase to continue
         end
     end
@@ -545,14 +439,8 @@ elseif nginx_narg_url ~= lsso_capture then
     -- Check for CDA
     if string.endswith(nginx_server_name, config.cookie_domain) then
         -- This is on the native domain SSO is served from, no need for CDA.
-        local expire_at = ngx.time() + config.cookie_lifetime
-        request_cookie:set({
-            key = util.cookie_key("Redirect"),
-            value = nginx_furl,
-            domain = "." .. config.cookie_domain,
-            path = "/",
-            expires = ngx.cookie_time(expire_at),
-        })
+        local expire_at = ngx.cookie_time(ngx.time() + config.cookie_lifetime)
+        util.set_cookie("Redirect", nginx_furl, expire_at)
     else
         -- This is NOT on the native domain. Have to start CDA.
         local uri_next = ngx.encode_base64(nginx_furl)
@@ -567,13 +455,8 @@ elseif nginx_narg_url ~= lsso_capture then
 
         -- Clear the redirect cookie since we won't be using it.
         if user_redirect then
-            request_cookie:set({
-                key = util.cookie_key("Redirect"),
-                value = "nil",
-                path = "/",
-                domain = "." .. session.get_cross_domain_base(nginx_server_name),
-                expires = util.COOKIE_EXPIRED
-            })
+            local cdb = "." .. session.get_cross_domain_base(nginx_server_name)
+            util.set_cookie("Redirect", nil, nil, cdb)
         end
     end
 
