@@ -26,6 +26,7 @@ dofile(config_path)
 -- Globals for other parts of the application
 rdc = nil -- Redis client
 rvn = nil -- Raven client
+request_cookie = nil -- Current request's cookie context
 
 -- Scope mapping global table.
 __scopes = {}

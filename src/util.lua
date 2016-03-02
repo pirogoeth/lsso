@@ -8,6 +8,7 @@ module('util', package.seeall)
 
 -- External library imports
 local cjson = require "cjson"
+local cookie = require "resty.cookie"
 local redis = require "redis"
 local socket = require "socket"
 
@@ -114,6 +115,53 @@ function generate_random_string(length)
     end
 
     return s
+end
+
+-- Simplifies the request_cookie:set() routine.
+--  Params:
+--   key_name - required - name of the cookie key, wrapped by cookie_key()
+--   value    - optional - value of the cookie, defaults to "nil",
+--                         if nil, expires cookie immediately
+--   expires  - optional - if true, expires cookie immediately. otherwise, is the
+--                         expiration time (string).
+--   domain   - optional - sets cookie domain, otherwise defaults to the
+--                         default cookie domain
+--   path     - optional - sets cookie path, otherwise defaults to "/"
+function set_cookie(key_name, value, expires, domain, path)
+    if key_name == nil then
+        return false
+    end
+
+    if expires == true then
+        expires = util.COOKIE_EXPIRED
+    elseif expires == nil then
+        local expire_at = ngx.time() + config.cookie_lifetime
+        expires = ngx.cookie_time(expire_at)
+    end
+
+    if value == nil then
+        value = "nil"
+        expires = util.COOKIE_EXPIRED
+    end
+
+    if domain == nil then
+        domain = "." .. config.cookie_domain
+    end
+
+    if path == nil then
+        path = "/"
+    end
+
+    request_cookie = cookie:new()
+    request_cookie:set({
+        key = util.cookie_key(key_name),
+        value = value,
+        path = path,
+        domain = domain,
+        expires = expires,
+    })
+
+    return true
 end
 
 -- Returns a SAML-specced UTC timestamp
