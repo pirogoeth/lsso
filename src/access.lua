@@ -39,7 +39,7 @@ local lsso_logging_context = {
     req_id = util.generate_random_string(16),
 }
 
-request_cookie = cookie:new()
+local request_cookie = cookie:new()
 
 -- This block covers general authentication, situations such as:
 --  - POST to the capture endpoint

@@ -152,7 +152,7 @@ function set_cookie(key_name, value, expires, domain, path)
         path = "/"
     end
 
-    request_cookie = cookie:new()
+    local request_cookie = cookie:new()
     request_cookie:set({
         key = util.cookie_key(key_name),
         value = value,
