@@ -15,6 +15,7 @@ Features:
  - CLI management tool, [lssoctl](https://github.com/maiome-development/lssoctl) (*In Progress!*)
  - Management API (*In Progress!*)
  - Temporary access token generation
+ - 2FA Support
 
 Requirements
 ============
@@ -26,7 +27,8 @@ Requirements
 - lua-cjson (https://github.com/efelix/lua-cjson)
 - redis-lua (https://github.com/nrk/redis-lua)
 - OAuth server (recommended: https://github.com/pirogoeth/osiris; has been tested)
-
+- authy-lua (required for authy-2fa; pkg: authy-lua >= 0.1.0-4, src: https://github.com/pirogoeth/authy-lua)
+  - lua-resty-http (required for authy-2fa; pkg: lua-resty-http 0.07-0, src: https://github.com/pintsized/lua-resty-http)
 
 Installation
 =============
@@ -54,7 +56,7 @@ Roadmap
     - _Stage_: Researching & implementing
   - [ ] Implement U2F Registration / Authentication process
     - _Stage_: Researching
-  - [ ] Use JWT cookie instead of set of unsigned cookies (? | [lua-resty-jwt](https://github.com/SkyLothar/lua-resty-jwt))
+  - [ ] Use JWT cookie instead of unsigned client cookies (? | [lua-resty-jwt](https://github.com/SkyLothar/lua-resty-jwt))
     - _Stage_: Researching
   - [X] Per-location auth scoping (customizable scopes for each protected location: `set $lsso_location_scope 'admin';` before `access_by_lua_file`)
 - API:
@@ -72,12 +74,26 @@ Roadmap
       - [X] /log/session - session event log
       - ...
     - ...
+- Metadata:
+  - [ ] Metadata store implementation
+    - Required for U2F and other 2FA implementations
+    - Should be an ephemeral data store, possibly key-value or record-based
+    - Implementation language does not need to be Lua...
+    - Should be simplistic, have an HTTP API, HTTP client
+    - Should *not* depend on a temporal data store such as Redis (unless configured as persistent store)
+    - _Stage_: Researching
 - Miscellaneous:
   - [ ] More documentation!
   - [ ] Stats collection for info about user sessions, login attempts, page accesses (?)
     - [ ] Stats export via statsd for aggregation (?)
   - [ ] Status portal (with *content_by_lua_file* and [lustache](https://github.com/Olivine-Labs/lustache))
-
+- Multi-Factor Auth:
+  - [ ] Implement base for 2FA...
+  - Major 2FA types:
+    - [ ] Authy
+      - _Stage_: Researching & implementation
+    - [ ] U2F
+      - _Stage_: Researching
 
 Contributing
 ============
