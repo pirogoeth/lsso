@@ -225,6 +225,13 @@ if nginx_narg_url == lsso_capture then
         end
         local location_scope = __scopes[user_redirect] or config.oauth_auth_scope
 
+        -- Now that we have our requested location scope, ensure that we include the default scope
+        -- if necessary, to reduce the number of scope upgrades.
+        if location_scope ~= config.oauth_auth_scope then
+            location_scope = string.format("%s %s", location_scope, config.oauth_auth_scope)
+        end
+
+        -- Merge the new scopes into the auth context table.
         util.merge_tables({
             scope = location_scope,
         }, auth_table)
