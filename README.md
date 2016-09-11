@@ -15,7 +15,7 @@ Features:
  - CLI management tool, [lssoctl](https://github.com/maiome-development/lssoctl) (*In Progress!*)
  - Management API (*In Progress!*)
  - Temporary access token generation
- - 2FA Support
+ - 2FA Support (*In Progress!*)
 
 Requirements
 ============
@@ -77,15 +77,16 @@ Roadmap
 - Metadata:
   - [ ] Metadata store implementation
     - Required for U2F and other 2FA implementations
-    - Should be an ephemeral data store, possibly key-value or record-based
+    - Should be a long-lived data store, possibly key-value or record-based
     - Implementation language does not need to be Lua...
     - Should be simplistic, have an HTTP API, HTTP client
-    - Should *not* depend on a temporal data store such as Redis (unless configured as persistent store)
+    - Should *not* depend on a ephemeral data store such as Redis (unless configured as persistent store)
     - _Stage_: Researching
 - Miscellaneous:
   - [ ] More documentation!
   - [ ] Stats collection for info about user sessions, login attempts, page accesses (?)
     - [ ] Stats export via statsd for aggregation (?)
+    - [ ] Stats export to InfluxDB (?)
   - [ ] Status portal (with *content_by_lua_file* and [lustache](https://github.com/Olivine-Labs/lustache))
 - Multi-Factor Auth:
   - [ ] Implement base for 2FA...
