@@ -50,7 +50,7 @@ config = {
     oauth_token_endpoint = "/checktoken", -- Endpoint used for checking tokens
     oauth_auth_scope = "sso", -- Default scope to request for SSO access
     oauth_auth_context = { -- Additional context to send in the request to OAuth
-        grant_type = "password", 
+        grant_type = "client_credentials",
     }, -- Additional static parameters that will be passed to the auth endpoint
 
     -- Location settings

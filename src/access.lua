@@ -208,8 +208,8 @@ if nginx_narg_url == lsso_capture then
     local auth_table = {}
     util.merge_tables(config.oauth_auth_context, auth_table)
 
-    auth_table["username"] = ngx.escape_uri(credentials["user"])
-    auth_table["password"] = ngx.escape_uri(credentials["password"])
+    username = ngx.escape_uri(credentials["user"])
+    password = ngx.escape_uri(credentials["password"])
 
     -- Grab the 'next' field.
     local next_uri = credentials["next"]
@@ -237,11 +237,19 @@ if nginx_narg_url == lsso_capture then
         }, auth_table)
     end
 
+    -- Construct the `Authorization` header
+    auth_header = username .. ":" .. password
+    auth_header = ngx.encode_base64(auth_header)
+    auth_header = ("Basic %s"):format(auth_header)
+
     -- Encode the auth_table as qs args
     auth_table = ngx.encode_args(auth_table)
 
-    -- Perform the token request.
+    -- Set request headers
+    ngx.req.set_header("Authorization", auth_header)
     ngx.req.set_header("Content-Type", "application/x-www-form-urlencoded")
+
+    -- Perform the token request.
     local okay, oauth_res = util.func_call(ngx.location.capture, config.oauth_auth_endpoint, {
         method = ngx.HTTP_POST,
         body = auth_table
@@ -281,11 +289,13 @@ if nginx_narg_url == lsso_capture then
 
     util.session_log("Created new session: " .. session_key, lsso_logging_context)
 
+    local initial_scopes = table.concat(auth_response.scopes, " ")
+
     -- Save the session in Redis
     rdc:pipeline(function(p)
         p:hset(rd_sess_key, "username", credentials["user"])
         p:hset(rd_sess_key, "token", auth_response.access_token)
-        p:hset(rd_sess_key, "scope", auth_response.scope)
+        p:hset(rd_sess_key, "scope", initial_scopes)
         p:hset(rd_sess_key, "created", current_time)
         p:hset(rd_sess_key, "remote_addr", nginx_client_address)
         p:hset(rd_sess_key, "salt", session_salt)
