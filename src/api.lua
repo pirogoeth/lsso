@@ -70,6 +70,7 @@ elseif lsso_api_request == "/token/request" then
         local err = {
             code = 400,
             message = "Missing `username` field",
+            req_id = lsso_logging_context["req_id"],
         }
         err = cjson.encode(err)
         ngx.say(err)
@@ -81,6 +82,7 @@ elseif lsso_api_request == "/token/request" then
         local err = {
             code = 400,
             message = "Missing `password` field",
+            req_id = lsso_logging_context["req_id"],
         }
         err = cjson.encode(err)
         ngx.say(err)
@@ -124,9 +126,12 @@ elseif lsso_api_request == "/token/request" then
     local auth_table = {}
     util.merge_tables(config.oauth_auth_context, auth_table)
 
+    -- Construct the `Authorization` header
+    auth_header = args["username"] .. ":" .. args["password"]
+    auth_header = ngx.encode_base64(auth_header)
+    auth_header = ("Basic %s"):format(auth_header)
+
     -- Add auth data to auth table, escape user-provided data
-    auth_table["username"] = ngx.escape_uri(args["username"])
-    auth_table["password"] = ngx.escape_uri(args["password"])
     auth_table["scope"] = ngx.escape_uri(args["scope"])
 
     -- Merge details into the logging context
@@ -137,6 +142,7 @@ elseif lsso_api_request == "/token/request" then
 
     auth_table = ngx.encode_args(auth_table)
 
+    ngx.req.set_header("Authorization", auth_header)
     ngx.req.set_header("Content-Type", "application/x-www-form-urlencoded")
     local okay, oauth_res = util.func_call(ngx.location.capture, config.oauth_auth_endpoint, {
         method = ngx.HTTP_POST,
@@ -148,6 +154,7 @@ elseif lsso_api_request == "/token/request" then
         local err = {
             code = oauth_res.status,
             message = "Upstream communication error",
+            req_id = lsso_logging_context["req_id"],
         }
         err = cjson.encode(err)
         ngx.say(err)
@@ -165,6 +172,7 @@ elseif lsso_api_request == "/token/request" then
             local err = {
                 code = oauth_res.status,
                 message = auth_response["error"],
+                req_id = lsso_logging_context["req_id"],
             }
             err = cjson.encode(err)
             ngx.say(err)
@@ -173,6 +181,7 @@ elseif lsso_api_request == "/token/request" then
             local err = {
                 code = oauth_res.status,
                 message = auth_response["error"],
+                req_id = lsso_logging_context["req_id"],
             }
             err = cjson.encode(err)
             ngx.say(err)
@@ -205,7 +214,7 @@ elseif lsso_api_request == "/token/request" then
         p:hset(rd_sess_key, "created", current_time)
         p:hset(rd_sess_key, "remote_addr", nginx_client_address)
         p:hset(rd_sess_key, "salt", session_salt)
-        p:hset(rd_sess_key, "origin", "api acctok")
+        p:hset(rd_sess_key, "origin", "api_access_token")
         p:expire(rd_sess_key, args["expire"])
     end)
 
@@ -240,6 +249,7 @@ elseif lsso_api_request:startswith("/log/") then
         local response = {
             code = 404,
             message = "Requested log bucket does not exist.",
+            req_id = lsso_logging_context["req_id"],
         }
         response = cjson.encode(response)
         ngx.say(response)
@@ -263,7 +273,8 @@ elseif lsso_api_request:startswith("/log/") then
         "Requested bucket: %s [page=%d limit=%d]",
         bucket,
         page,
-        limit))
+        limit
+    ))
 
     local log_data = util.log_fetch(bucket, page, limit)
     local response = {
