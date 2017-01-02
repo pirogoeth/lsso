@@ -206,11 +206,13 @@ elseif lsso_api_request == "/token/request" then
     local rd_sess_key = util.redis_key("session:" .. session_key)
     local current_time = ngx.now()
 
+    local initial_scopes = table.concat(auth_response.scopes, " ")
+
     -- Save the session in Redis
     rdc:pipeline(function(p)
         p:hset(rd_sess_key, "username", args["username"])
         p:hset(rd_sess_key, "token", auth_response.access_token)
-        p:hset(rd_sess_key, "scope", auth_response.scope)
+        p:hset(rd_sess_key, "scope", initial_scopes)
         p:hset(rd_sess_key, "created", current_time)
         p:hset(rd_sess_key, "remote_addr", nginx_client_address)
         p:hset(rd_sess_key, "salt", session_salt)
